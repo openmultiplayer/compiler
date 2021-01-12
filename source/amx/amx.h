@@ -124,7 +124,7 @@
     #define _ASSERT_STATIC_SYMBOL(line) _ASSERT_STATIC_SYMBOL_INNER(line)
     #define assert_static(test) \
       do { \
-        typedef char _ASSERT_STATIC_SYMBOL(__LINE__)[ ((test) ? 1 : -1) ]; \
+        [[maybe_unused]] typedef char _ASSERT_STATIC_SYMBOL(__LINE__)[ ((test) ? 1 : -1) ]; \
       } while (0)
   #endif
 #endif
