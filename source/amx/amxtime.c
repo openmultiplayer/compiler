@@ -137,108 +137,6 @@ void stamp2datetime(unsigned long sec1970,
   *second = (int)sec1970;
 }
 
-static void settime(cell hour,cell minute,cell second)
-{
-  #if defined __WIN32__ || defined _WIN32 || defined WIN32
-    SYSTEMTIME systim;
-
-    GetLocalTime(&systim);
-    if (hour!=CELLMIN)
-      systim.wHour=(WORD)wrap((int)hour,0,23);
-    if (minute!=CELLMIN)
-      systim.wMinute=(WORD)wrap((int)minute,0,59);
-    if (second!=CELLMIN)
-      systim.wSecond=(WORD)wrap((int)second,0,59);
-    SetLocalTime(&systim);
-  #else
-    /* Linux/Unix (and some DOS compilers) have stime(); on Linux/Unix, you
-     * must have "root" permission to call stime(); many POSIX systems will
-     * have settimeofday() instead
-     */
-    time_t sec1970;
-    struct tm gtm;
-    #if defined __APPLE__ /* also valid for other POSIX systems */
-      struct timeval tv;
-    #endif
-
-    time(&sec1970);
-    gtm=*localtime(&sec1970);
-    if (hour!=CELLMIN)
-      gtm.tm_hour=wrap((int)hour,0,23);
-    if (minute!=CELLMIN)
-      gtm.tm_min=wrap((int)minute,0,59);
-    if (second!=CELLMIN)
-      gtm.tm_sec=wrap((int)second,0,59);
-    sec1970=mktime(&gtm);
-    #if defined __APPLE__ /* also valid for other POSIX systems */
-      tv.tv_sec = sec1970;
-      tv.tv_usec = 0;
-      settimeofday(&tv, 0);
-    #else
-      stime(&sec1970);
-    #endif
-  #endif
-}
-
-static void setdate(cell year,cell month,cell day)
-{
-  int maxday;
-
-  #if defined __WIN32__ || defined _WIN32 || defined WIN32
-    SYSTEMTIME systim;
-
-    GetLocalTime(&systim);
-    if (year!=CELLMIN)
-      systim.wYear=(WORD)wrap((int)year,1970,2099);
-    if (month!=CELLMIN)
-      systim.wMonth=(WORD)wrap((int)month,1,12);
-    maxday=monthdays[systim.wMonth - 1];
-    if (systim.wMonth==2 && ((systim.wYear % 4)==0 && ((systim.wYear % 100)!=0 || (systim.wYear % 400)==0)))
-      maxday++;
-    if (day!=CELLMIN)
-      systim.wDay=(WORD)wrap((int)day,1,maxday);
-    SetLocalTime(&systim);
-  #else
-    /* Linux/Unix (and some DOS compilers) have stime(); on Linux/Unix, you
-     * must have "root" permission to call stime(); many POSIX systems will
-     * have settimeofday() instead
-     */
-    time_t sec1970;
-    struct tm gtm;
-    #if defined __APPLE__ /* also valid for other POSIX systems */
-      struct timeval tv;
-    #endif
-
-    time(&sec1970);
-    gtm=*localtime(&sec1970);
-    if (year!=CELLMIN)
-      gtm.tm_year=year-1900;
-    if (month!=CELLMIN)
-      gtm.tm_mon=month-1;
-    if (day!=CELLMIN)
-      gtm.tm_mday=day;
-    sec1970=mktime(&gtm);
-    #if defined __APPLE__ /* also valid for other POSIX systems */
-      tv.tv_sec = sec1970;
-      tv.tv_usec = 0;
-      settimeofday(&tv, 0);
-    #else
-      stime(&sec1970);
-    #endif
-  #endif
-}
-
-
-/* settime(hour, minute, second)
- * Always returns 0
- */
-static cell AMX_NATIVE_CALL n_settime(AMX *amx, const cell *params)
-{
-  (void)amx;
-  settime(params[1],params[2],params[3]);
-  return 0;
-}
-
 /* gettime(&hour, &minute, &second)
  * The return value is the number of seconds since 1 January 1970 (Unix system
  * time).
@@ -268,16 +166,6 @@ static cell AMX_NATIVE_CALL n_gettime(AMX *amx, const cell *params)
    * in Universal Coordinated Time (the successor to Greenwich Mean Time)
    */
   return (cell)sec1970;
-}
-
-/* setdate(year, month, day)
- * Always returns 0
- */
-static cell AMX_NATIVE_CALL n_setdate(AMX *amx, const cell *params)
-{
-  (void)amx;
-  setdate(params[1],params[2],params[3]);
-  return 0;
 }
 
 /* getdate(&year, &month, &day)
@@ -372,39 +260,6 @@ static cell AMX_NATIVE_CALL n_gettimer(AMX *amx, const cell *params)
   return timelimit>0;
 }
 
-/* settimestamp(seconds1970) sets the date and time from a single parameter: the
- * number of seconds since 1 January 1970.
- */
-static cell AMX_NATIVE_CALL n_settimestamp(AMX *amx, const cell *params)
-{
-  #if defined __WIN32__ || defined _WIN32 || defined WIN32
-    int year, month, day, hour, minute, second;
-
-    stamp2datetime(params[1],
-                   &year, &month, &day,
-                   &hour, &minute, &second);
-    setdate(year, month, day);
-    settime(hour, minute, second);
-  #else
-    /* Linux/Unix (and some DOS compilers) have stime(); on Linux/Unix, you
-     * must have "root" permission to call stime(); many POSIX systems will
-     * have settimeofday() instead
-     */
-    #if defined __APPLE__ /* also valid for other POSIX systems */
-      struct timeval tv;
-      tv.tv_sec = params[1];
-      tv.tv_usec = 0;
-      settimeofday(&tv, 0);
-    #else
-      time_t sec1970=(time_t)params[1];
-      stime(&sec1970);
-    #endif
-  #endif
-  (void)amx;
-
-  return 0;
-}
-
 /* cvttimestamp(seconds1970, &year, &month, &day, &hour, &minute, &second)
  */
 static cell AMX_NATIVE_CALL n_cvttimestamp(AMX *amx, const cell *params)
@@ -452,14 +307,11 @@ static int AMXAPI amx_TimeIdle(AMX *amx, int AMXAPI Exec(AMX *, cell *, int))
 #endif
 const AMX_NATIVE_INFO time_Natives[] = {
   { "gettime",      n_gettime },
-  { "settime",      n_settime },
   { "getdate",      n_getdate },
-  { "setdate",      n_setdate },
   { "tickcount",    n_tickcount },
   { "settimer",     n_settimer },
   { "gettimer",     n_gettimer },
   { "delay",        n_delay },
-  { "settimestamp", n_settimestamp },
   { "cvttimestamp", n_cvttimestamp },
   { NULL, NULL }        /* terminator */
 };
