@@ -573,6 +573,8 @@ static cell AMX_NATIVE_CALL n_strval(AMX *amx,const cell *params)
   /* get parameters */
   cstr=amx_Address(amx,params[1]);
   amx_StrLen(cstr,&len);
+  if (len == 0)
+    return 0;
   if ((unsigned)params[0]>=2*sizeof(cell))
     offset=params[2];
   if (offset<0)
