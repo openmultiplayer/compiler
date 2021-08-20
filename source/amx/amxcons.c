@@ -1108,8 +1108,10 @@ int amx_printstring(AMX *amx,cell *cstr,AMX_FMTINFO *info)
           break;
         case 1:
           assert(info!=NULL && info->params!=NULL);
-          if (paramidx>=info->numparams)  /* insufficient parameters passed */
+          if (paramidx>=info->numparams) {  /* insufficient parameters passed */
+            amx_RaiseError(amx, AMX_ERR_NATIVE);
             return paramidx - 1;
+          }
           else
             thisparam=dochar(amx,c,info->params,thisparam,sign,decpoint,width,digits,filler,
                              f_putstr,f_putchar,user);
@@ -1136,8 +1138,10 @@ int amx_printstring(AMX *amx,cell *cstr,AMX_FMTINFO *info)
           break;
         case 1:
           assert(info!=NULL && info->params!=NULL);
-          if (paramidx>=info->numparams)  /* insufficient parameters passed */
+          if (paramidx>=info->numparams) {  /* insufficient parameters passed */
+            amx_RaiseError(amx, AMX_ERR_NATIVE);
             return paramidx - 1;
+          }
           else
             thisparam=dochar(amx,(TCHAR)cstr[i],info->params,thisparam,sign,decpoint,width,digits,filler,
                              f_putstr,f_putchar,user);
@@ -1154,9 +1158,12 @@ int amx_printstring(AMX *amx,cell *cstr,AMX_FMTINFO *info)
 
   } /* if (info==NULL || info->params==NULL) */
 
-  if(info != NULL) {
-    if(paramidx < info->numparams)
-      return INT_MAX;
+  if(
+    info != NULL
+    && paramidx < info->numparams
+  ) {
+    amx_RaiseError(amx, AMX_ERR_NATIVE);
+    return INT_MAX;
   }
 
   return paramidx;
