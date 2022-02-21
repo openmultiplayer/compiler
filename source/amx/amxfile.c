@@ -520,6 +520,10 @@ static cell AMX_NATIVE_CALL n_fopen(AMX *amx, const cell *params)
 /* fclose(File: handle) */
 static cell AMX_NATIVE_CALL n_fclose(AMX *amx, const cell *params)
 {
+  if (!params[1]) {
+      return 0;
+  }
+
   (void)amx;
   return fclose((FILE*)params[1]) == 0;
 }
@@ -527,6 +531,10 @@ static cell AMX_NATIVE_CALL n_fclose(AMX *amx, const cell *params)
 /* fwrite(File: handle, const string[]) */
 static cell AMX_NATIVE_CALL n_fwrite(AMX *amx, const cell *params)
 {
+  if (!params[1]) {
+      return 0;
+  }
+
   size_t r = 0;
   cell *cptr;
   char *str;
@@ -554,6 +562,10 @@ static cell AMX_NATIVE_CALL n_fwrite(AMX *amx, const cell *params)
 /* fread(File: handle, string[], size=sizeof string, bool:pack=false) */
 static cell AMX_NATIVE_CALL n_fread(AMX *amx, const cell *params)
 {
+  if (!params[1]) {
+      return 0;
+  }
+
   size_t chars;
   int max;
   char *str;
@@ -589,6 +601,10 @@ static cell AMX_NATIVE_CALL n_fread(AMX *amx, const cell *params)
 /* fputchar(File: handle, value, bool:utf8 = true) */
 static cell AMX_NATIVE_CALL n_fputchar(AMX *amx, const cell *params)
 {
+  if (!params[1]) {
+      return 0;
+  }
+
   size_t result;
 
   (void)amx;
@@ -608,6 +624,10 @@ static cell AMX_NATIVE_CALL n_fputchar(AMX *amx, const cell *params)
 /* fgetchar(File: handle, bool:utf8 = true) */
 static cell AMX_NATIVE_CALL n_fgetchar(AMX *amx, const cell *params)
 {
+  if (!params[1]) {
+      return 0;
+  }
+
   cell str[2];
   size_t result;
 
@@ -638,6 +658,10 @@ static cell AMX_NATIVE_CALL n_fgetchar(AMX *amx, const cell *params)
 /* fblockwrite(File: handle, buffer[], size=sizeof buffer) */
 static cell AMX_NATIVE_CALL n_fblockwrite(AMX *amx, const cell *params)
 {
+  if (!params[1]) {
+      return 0;
+  }
+
   cell *cptr;
   cell count=0;
 
@@ -658,6 +682,10 @@ static cell AMX_NATIVE_CALL n_fblockwrite(AMX *amx, const cell *params)
 /* fblockread(File: handle, buffer[], size=sizeof buffer) */
 static cell AMX_NATIVE_CALL n_fblockread(AMX *amx, const cell *params)
 {
+  if (!params[1]) {
+      return 0;
+  }
+
   cell *cptr;
   cell count=0;
 
@@ -686,6 +714,10 @@ static cell AMX_NATIVE_CALL n_ftemp(AMX *amx, const cell *params)
 /* fseek(File: handle, position, seek_whence: whence=seek_start) */
 static cell AMX_NATIVE_CALL n_fseek(AMX *amx, const cell *params)
 {
+  if (!params[1]) {
+      return 0;
+  }
+
   int whence;
   (void)amx;
   switch (params[3]) {
@@ -773,6 +805,10 @@ static cell AMX_NATIVE_CALL n_frename(AMX *amx, const cell *params)
 /* flength(File: handle) */
 static cell AMX_NATIVE_CALL n_flength(AMX *amx, const cell *params)
 {
+  if (!params[1]) {
+      return 0;
+  }
+
   long l,c;
   int fn=fileno((FILE*)params[1]);
   c=lseek(fn,0,SEEK_CUR); /* save the current position */
