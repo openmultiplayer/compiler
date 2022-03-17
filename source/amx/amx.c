@@ -1778,7 +1778,7 @@ int AMXAPI amx_PushStringLen(AMX* amx, cell* amx_addr, cell** phys_addr, const c
 
     assert(amx != NULL);
 
-    numcells = length;
+    numcells = length + 1;
 
     if (pack)
         numcells = (numcells + sizeof(cell) - 1) / sizeof(cell);
@@ -1803,7 +1803,7 @@ int AMXAPI amx_PushString(AMX *amx, cell *amx_addr, cell **phys_addr, const char
   #if defined AMX_ANSIONLY
     length = strlen(string) + 1;
   #else
-    length = (use_wchar ? wcslen((const wchar_t*)string) : strlen(string)) + 1;
+    length = (use_wchar ? wcslen((const wchar_t*)string) : strlen(string));
   #endif
     return amx_PushStringLen(amx, amx_addr, phys_addr, string, length, pack, use_wchar);
 }
