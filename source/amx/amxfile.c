@@ -62,7 +62,7 @@
 #endif
 #include "amx.h"
 #if defined __WIN32__ || defined _Windows
-#include <windows.h>
+  #include <windows.h>
 #elif defined __GNUC__ || defined __clang__
   #include <unistd.h>
 #endif
