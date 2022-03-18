@@ -283,7 +283,7 @@ static cell AMX_NATIVE_CALL core_tolower(AMX *amx,const cell *params)
   #endif
 }
 
-static cell AMX_NATIVE_CALL core_toupper(AMX *amx,const cell *params)
+static cell AMX_NATIVE_CALL core_toupper(AMX *amx, const cell *params)
 {
   (void)amx;
   #if (defined __WIN32__ || defined _WIN32 || defined WIN32) && !defined _WIN64
@@ -433,6 +433,8 @@ static cell AMX_NATIVE_CALL core_random(AMX *amx,const cell *params)
 {
     unsigned long lo, hi, ll, lh, hh, hl;
     unsigned long result;
+    char invert = params[1] < 0 ? 1 : 0;
+    cell value = abs(params[1]);
 
     /* one-time initialization (or, mostly one-time) */
     #if !defined SN_TARGET_PS2 && !defined _WIN32_WCE && !defined __ICC430__
@@ -451,9 +453,9 @@ static cell AMX_NATIVE_CALL core_random(AMX *amx,const cell *params)
     hh = hi * (IL_RMULT >> 16    );
     result = ((ll + 12345) >> 16) + lh + hl + (hh << 16);
     result &= ~LONG_MIN;        /* remove sign bit */
-    if (params[1]!=0)
-        result %= params[1];
-    return (cell)result;
+    if (value != 0)
+        result %= value;
+    return !invert ? (cell)result : -(cell)result;
 }
 #endif
 
