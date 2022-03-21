@@ -380,7 +380,12 @@ static cell AMX_NATIVE_CALL n_strfind(AMX *amx,const cell *params)
   f=extractchar(csub,0,params[3]);
   assert(f!=0);         /* string length is already checked */
 
-  for (offs=(int)params[4]; offs+lensub<=lenstr; offs++) {
+  int start_pos = (int)params[4];
+
+  if (start_pos < 0)
+      start_pos = 0;
+
+  for (offs=start_pos; offs+lensub<=lenstr; offs++) {
     /* find the initial character */
     c=extractchar(csub,0,params[3]);
     assert(c!=0);      /* string length is already checked */
@@ -467,7 +472,12 @@ static cell AMX_NATIVE_CALL n_strdel(AMX *amx,const cell *params)
   /* calculate number of cells needed for (packed) destination */
   cstr=amx_Address(amx,params[1]);
   amx_StrLen(cstr,&length);
+
   index=(int)params[2];
+
+  if (index < 0)
+      index = 0;
+
   offs=(int)params[3]-index;
   if (index>=length || offs<=0)
     return 0;
@@ -505,67 +515,96 @@ static cell AMX_NATIVE_CALL n_strins(AMX* amx, const cell* params)
     cell c;
 
     /* calculate number of cells needed for (packed) destination */
+
     cstr = amx_Address(amx, params[1]);
     csub = amx_Address(amx, params[2]);
+
     amx_StrLen(cstr, &lenstr);
     amx_StrLen(csub, &lensub);
+
     index = (int)params[3];
     maxlen = (int)params[4];
+
     if ((ucell)*cstr > UNPACKEDMAX)
         maxlen *= sizeof(cell);
+
     maxlen -= 1;
 
     if (index < 0)
-      index += lenstr;
+        index = 0;
 
     if (index > lenstr || index > maxlen)
         return amx_RaiseError(amx, AMX_ERR_NATIVE);
 
+    /* current string is empty (and the insertion point is zero), just make a copy */
     if (lenstr == 0) {
-        /* current string is empty (and the insertion point is zero), just make a copy */
         assert(index == 0);
+
         if (lensub > maxlen)
             lensub = maxlen;
+
         if ((ucell)*csub > UNPACKEDMAX)
             amx_StrPack(cstr, csub, lensub, 0);
         else
             amx_StrUnpack(cstr, csub, lensub);
         return 1;
-    } /* if */
-
-    lenstr += lensub; /* length after insertion */
-    if (lenstr >= maxlen) {
-        lenstr = maxlen - 1;
     }
 
-    int amount = (maxlen < lensub ? maxlen : lensub + 1) - index;
+    if (lenstr + lensub >= maxlen && index + lensub >= maxlen) {
+        int max_substr = maxlen - index;
+
+        if ((ucell)*cstr > UNPACKEDMAX) {
+            for (count = 0; count < max_substr; count++) {
+                c = extractchar(csub, count, 0);
+                ptr = packedptr(cstr, index + count);
+                *ptr = (unsigned char)c;
+            }
+            *(packedptr(cstr, maxlen)) = 0;
+        } else {
+            for (count = 0; count < max_substr; count++) {
+                c = extractchar(csub, count, 0);
+                cstr[index + count] = c;
+            }
+            cstr[maxlen] = 0;
+        }
+
+        return 1;
+    }
+
+    int final_len = lenstr + lensub; /* length after insertion */
+
+    if (final_len >= maxlen)
+        final_len = maxlen - 1;
 
     if ((ucell)*cstr > UNPACKEDMAX) {
         /* make room for the new characters */
-        for (count = lenstr; count > index; count--) {
-            ptr = packedptr(cstr, count - amount);
+        for (count = final_len; count > index; count--) {
+            ptr = packedptr(cstr, count - lensub);
             c = *ptr;
             ptr = packedptr(cstr, count);
             *ptr = (unsigned char)c;
-        } /* for */
+        }
+
         /* copy in the new characters */
-        for (count = 0; count < amount; count++) {
+        for (count = 0; count < lensub; count++) {
             c = extractchar(csub, count, 0);
             ptr = packedptr(cstr, index + count);
             *ptr = (unsigned char)c;
-        } /* for */
+        }
         *(packedptr(cstr, maxlen)) = 0;
     } else {
         /* make room for the new characters */
-        for (count = lenstr; count > index; count--)
-            cstr[count] = cstr[count - amount];
+        for (count = final_len; count > index; count--)
+            cstr[count] = cstr[count - lensub];
+
         /* copy in the new characters */
-        for (count = 0; count < amount; count++) {
+        for (count = 0; count < lensub; count++) {
             c = extractchar(csub, count, 0);
             cstr[index + count] = c;
-        } /* for */
+        }
         cstr[maxlen] = 0;
-    } /* if */
+    }
+
     return 1;
 }
 

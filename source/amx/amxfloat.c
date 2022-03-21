@@ -150,8 +150,14 @@ static cell AMX_NATIVE_CALL n_floatfract(AMX *amx,const cell *params)
     *   params[0] = number of bytes
     *   params[1] = float operand
     */
+
     REAL fA = amx_ctof(params[1]);
-    fA = fA - (REAL)(floor((double)fA));
+
+    if (fA >= 0.0)
+      fA = fA - (REAL)(floor((double)fA));
+    else
+      fA = fA - (REAL)(ceil((double)fA));
+
     (void)amx;
     return amx_ftoc(fA);
 }
