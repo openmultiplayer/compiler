@@ -604,7 +604,6 @@ static cell AMX_NATIVE_CALL n_strins(AMX* amx, const cell* params)
         }
         cstr[maxlen] = 0;
     }
-
     return 1;
 }
 
