@@ -300,7 +300,7 @@ typedef enum {
 #define NUMENTRIES(hdr,field,nextfield) \
                         (unsigned)(((hdr)->nextfield - (hdr)->field) / (hdr)->defsize)
 #define GETENTRY(hdr,table,index) \
-                        (AMX_FUNCSTUB *)((unsigned char*)(hdr) + (unsigned)(hdr)->table + (unsigned)index*(hdr)->defsize)
+                        (AMX_FUNCPART *)((unsigned char*)(hdr) + (unsigned)(hdr)->table + (unsigned)index*(hdr)->defsize)
 #define GETENTRYNAME(hdr,entry) \
                         ( USENAMETABLE(hdr) \
                            ? (char *)((unsigned char*)(hdr) + (unsigned)((AMX_FUNCSTUBNT*)(entry))->nameofs) \
@@ -451,7 +451,7 @@ int AMXAPI amx_Callback(AMX *amx, cell index, cell *result, const cell *params)
   extern AMX_NATIVE const AMX_NATIVETABLE[];
 #endif
   AMX_HEADER *hdr;
-  AMX_FUNCSTUB *func;
+  AMX_FUNCPART *func;
   AMX_NATIVE f;
 
   assert(amx!=NULL);
@@ -467,7 +467,7 @@ int AMXAPI amx_Callback(AMX *amx, cell index, cell *result, const cell *params)
 #endif
     assert(index>=0 && index<(cell)NUMENTRIES(hdr,natives,libraries));
     func=GETENTRY(hdr,natives,index);
-    f=(AMX_NATIVE)func->address;
+    f=(AMX_NATIVE)((AMX_FUNCWIDE *)func)->address;
 #if defined AMX_NATIVETABLE
   } /* if */
 #endif
@@ -940,7 +940,7 @@ int AMXAPI amx_Init(AMX *amx,void *program)
       #endif
     #endif
     int numlibraries,i;
-    AMX_FUNCSTUB *lib;
+    AMX_FUNCPART *lib;
     AMX_ENTRY libinit;
   #endif
 
@@ -1037,7 +1037,7 @@ int AMXAPI amx_Init(AMX *amx,void *program)
    */
   #if BYTE_ORDER==BIG_ENDIAN
   { /* local */
-    AMX_FUNCSTUB *fs;
+    AMX_FUNCPART *fs;
     int i,num;
 
     fs=GETENTRY(hdr,natives,0);
@@ -1046,7 +1046,7 @@ int AMXAPI amx_Init(AMX *amx,void *program)
       amx_AlignCell(&fs->address);      /* redundant, because it should be zero */
       if (USENAMETABLE(hdr))
         amx_Align32(&((AMX_FUNCSTUBNT*)fs)->nameofs);
-      fs=(AMX_FUNCSTUB*)((unsigned char *)fs+hdr->defsize);
+      fs=(AMX_FUNCPART*)((unsigned char *)fs+hdr->defsize);
     } /* for */
 
     fs=GETENTRY(hdr,publics,0);
@@ -1056,7 +1056,7 @@ int AMXAPI amx_Init(AMX *amx,void *program)
       amx_AlignCell(&fs->address);
       if (USENAMETABLE(hdr))
         amx_Align32(&((AMX_FUNCSTUBNT*)fs)->nameofs);
-      fs=(AMX_FUNCSTUB*)((unsigned char *)fs+hdr->defsize);
+      fs=(AMX_FUNCPART*)((unsigned char *)fs+hdr->defsize);
     } /* for */
 
     fs=GETENTRY(hdr,pubvars,0);
@@ -1066,7 +1066,7 @@ int AMXAPI amx_Init(AMX *amx,void *program)
       amx_AlignCell(&fs->address);
       if (USENAMETABLE(hdr))
         amx_Align32(&((AMX_FUNCSTUBNT*)fs)->nameofs);
-      fs=(AMX_FUNCSTUB*)((unsigned char *)fs+hdr->defsize);
+      fs=(AMX_FUNCPART*)((unsigned char *)fs+hdr->defsize);
     } /* for */
 
     fs=GETENTRY(hdr,tags,0);
@@ -1081,7 +1081,7 @@ int AMXAPI amx_Init(AMX *amx,void *program)
       amx_AlignCell(&fs->address);
       if (USENAMETABLE(hdr))
         amx_Align32(&((AMX_FUNCSTUBNT*)fs)->nameofs);
-      fs=(AMX_FUNCSTUB*)((unsigned char *)fs+hdr->defsize);
+      fs=(AMX_FUNCPART*)((unsigned char *)fs+hdr->defsize);
     } /* for */
   } /* local */
   #endif
@@ -1193,13 +1193,6 @@ int AMXAPI amx_InitJIT(AMX *amx, void *reloc_table, void *native_code)
   if (hdr->file_version>MAX_FILE_VER_JIT)
     return AMX_ERR_VERSION;     /* JIT may not support the newest file version(s) */
 
-  /* Patching SYSREQ.C opcodes to SYSREQ.D cannot work in the JIT, because the
-   * program would need to be re-JIT-compiled after patching a P-code
-   * instruction. If this field is not zero, something went wrong with the
-   * amx_BrowseRelocate().
-   */
-  assert(amx->sysreq_d==0);
-
   if (mprotect(ALIGN(asm_runJIT), CODESIZE_JIT, PROT_READ | PROT_WRITE | PROT_EXEC) != 0)
     return AMX_ERR_INIT_JIT;
 
@@ -1256,7 +1249,7 @@ int AMXAPI amx_Cleanup(AMX *amx)
     #endif
     AMX_HEADER *hdr;
     int numlibraries,i;
-    AMX_FUNCSTUB *lib;
+    AMX_FUNCPART *lib;
     AMX_ENTRY libcleanup;
   #endif
 
@@ -1393,7 +1386,7 @@ int AMXAPI amx_NumNatives(AMX *amx, int *number)
 int AMXAPI amx_GetNative(AMX *amx, int index, char *funcname)
 {
   AMX_HEADER *hdr;
-  AMX_FUNCSTUB *func;
+  AMX_FUNCPART *func;
 
   hdr=(AMX_HEADER *)amx->base;
   assert(hdr!=NULL);
@@ -1449,7 +1442,7 @@ int AMXAPI amx_NumPublics(AMX *amx, int *number)
 int AMXAPI amx_GetPublic(AMX *amx, int index, char *funcname)
 {
   AMX_HEADER *hdr;
-  AMX_FUNCSTUB *func;
+  AMX_FUNCPART *func;
 
   hdr=(AMX_HEADER *)amx->base;
   assert(hdr!=NULL);
@@ -1505,7 +1498,7 @@ int AMXAPI amx_NumPubVars(AMX *amx, int *number)
 int AMXAPI amx_GetPubVar(AMX *amx, int index, char *varname, cell *amx_addr)
 {
   AMX_HEADER *hdr;
-  AMX_FUNCSTUB *var;
+  AMX_FUNCPART *var;
 
   hdr=(AMX_HEADER *)amx->base;
   assert(hdr!=NULL);
@@ -1572,7 +1565,7 @@ int AMXAPI amx_NumTags(AMX *amx, int *number)
 int AMXAPI amx_GetTag(AMX *amx, int index, char *tagname, cell *tag_id)
 {
   AMX_HEADER *hdr;
-  AMX_FUNCSTUB *tag;
+  AMX_FUNCPART *tag;
 
   hdr=(AMX_HEADER *)amx->base;
   assert(hdr!=NULL);
@@ -1691,7 +1684,7 @@ static AMX_NATIVE findfunction(const char *name, const AMX_NATIVE_INFO *list, in
 
 int AMXAPI amx_Register(AMX *amx, const AMX_NATIVE_INFO *list, int number)
 {
-  AMX_FUNCSTUB *func;
+  AMX_FUNCPART *func;
   AMX_HEADER *hdr;
   int i,numnatives,err;
   AMX_NATIVE funcptr;
@@ -1713,7 +1706,7 @@ int AMXAPI amx_Register(AMX *amx, const AMX_NATIVE_INFO *list, int number)
       else
         err=AMX_ERR_NOTFOUND;
     } /* if */
-    func=(AMX_FUNCSTUB*)((unsigned char*)func+hdr->defsize);
+    func=(AMX_FUNCPART*)((unsigned char*)func+hdr->defsize);
   } /* for */
   if (err==AMX_ERR_NONE)
     amx->flags|=AMX_FLAG_NTVREG;
@@ -1915,7 +1908,7 @@ static const void * const amx_opcodelist[] = {
         &&op_push5_s,   &&op_push5_adr, &&op_load_both, &&op_load_s_both,
         &&op_const,     &&op_const_s,   &&op_sysreq_d,  &&op_sysreq_nd };
   AMX_HEADER *hdr;
-  AMX_FUNCSTUB *func;
+  AMX_FUNCPART *func;
   unsigned char *code, *data;
   cell pri,alt,stk,frm,hea;
   cell reset_stk, reset_hea, *cip;
@@ -3043,7 +3036,7 @@ static const void * const amx_opcodelist[] = {
 int AMXAPI amx_Exec(AMX *amx, cell *retval, int index)
 {
   AMX_HEADER *hdr;
-  AMX_FUNCSTUB *func;
+  AMX_FUNCPART *func;
   unsigned char *code, *data;
   cell pri,alt,stk,frm,hea;
   cell reset_stk, reset_hea, *cip;
