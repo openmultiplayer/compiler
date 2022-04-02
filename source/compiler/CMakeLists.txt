@@ -1,11 +1,13 @@
 project(pawnc C)
 cmake_minimum_required(VERSION 2.8)
 
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../../cmake)
 
 set(VERSION_MAJOR 3)
 set(VERSION_MINOR 10)
-set(VERSION_BUILD 10)
+set(VERSION_BUILD 11)
 set(VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_BUILD})
 set(VERSION_STR ${VERSION})
 math(EXPR VERSION_INT "${VERSION_MAJOR} << 8 | ${VERSION_MINOR}")
@@ -174,6 +176,7 @@ if(BUILD_TESTING)
     ../amx/amxaux.h
     ../amx/amxcons.c
     ../amx/amxcore.c
+    ../amx/amxstring.c
   )
   if(UNIX)
     set(PAWNRUNS_SRCS

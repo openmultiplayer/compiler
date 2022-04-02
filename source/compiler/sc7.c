@@ -4,7 +4,7 @@
  *  ------------------
  *  The staging buffer allows buffered output of generated code, deletion
  *  of redundant code, optimization by a tinkering process and reversing
- *  the ouput of evaluated expressions (which is used for the reversed
+ *  the output of evaluated expressions (which is used for the reversed
  *  evaluation of arguments in functions).
  *  Initially, stgwrite() writes to the file directly, but after a call to
  *  stgset(TRUE), output is redirected to the buffer. After a call to
@@ -163,7 +163,7 @@ static SEQUENCE sequences[] = {
    *    push.pri                -
    *    load.s.pri n1           -
    *    pop.alt                 -
-   * The above also accurs for "load.pri" and for "const.pri",
+   * The above also occurs for "load.pri" and for "const.pri",
    * so add another two cases.
    */
   {
@@ -597,7 +597,7 @@ static SEQUENCE sequences[] = {
    *    load.s.pri n1           load.s.pri n1
    *    pop.alt                 -
    *
-   * The above also accurs for "load.pri" and for "const.pri",
+   * The above also occurs for "load.pri" and for "const.pri",
    * so add another two cases.
    */
   {
@@ -1254,17 +1254,19 @@ static void stgopt(char *start,char *end,int (*outputfunc)(char *str));
 #define sSTG_MAX    20480
 
 static char *stgbuf=NULL;
-static int stgmax=0;    /* current size of the staging buffer */
-static int stglen=0;    /* current length of the staging buffer */
+static int stgmax=0;           /* current size of the staging buffer */
+static int stglen=0;           /* current length of the staging buffer */
+static int stggrow=sSTG_GROW;  /* amount to increase the staging buffer by */
 
 static char *stgpipe=NULL;
-static int pipemax=0;   /* current size of the stage pipe, a second staging buffer */
+static int pipemax=0;          /* current size of the stage pipe, a second staging buffer */
 static int pipeidx=0;
+static int pipegrow=sSTG_GROW; /* amount to increase the staging pipe by */
 
-#define CHECK_STGBUFFER(index) if ((int)(index)>=stgmax)  grow_stgbuffer(&stgbuf, &stgmax, (index)+1)
-#define CHECK_STGPIPE(index)   if ((int)(index)>=pipemax) grow_stgbuffer(&stgpipe, &pipemax, (index)+1)
+#define CHECK_STGBUFFER(index) if ((int)(index)>=stgmax)  grow_stgbuffer(&stgbuf, &stgmax, &stggrow, (index)+1)
+#define CHECK_STGPIPE(index)   if ((int)(index)>=pipemax) grow_stgbuffer(&stgpipe, &pipemax, &pipegrow, (index)+1)
 
-static void grow_stgbuffer(char **buffer, int *curmax, int requiredsize)
+static void grow_stgbuffer(char **buffer, int *curmax, int *growth, int requiredsize)
 {
   char *p;
   int clear= (*buffer==NULL); /* if previously none, empty buffer explicitly */
@@ -1275,7 +1277,8 @@ static void grow_stgbuffer(char **buffer, int *curmax, int requiredsize)
    */
   if (requiredsize>sSTG_MAX)
     error(102,"staging buffer");    /* staging buffer overflow (fatal error) */
-  *curmax=requiredsize+sSTG_GROW;
+  *curmax=requiredsize+*growth;
+  *growth*=2; /* not as easy to grow this one by fibonacci, just double it */
   p=(char *)realloc(*buffer,*curmax*sizeof(char));
   if (p==NULL)
     error(102,"staging buffer");    /* staging buffer overflow (fatal error) */
@@ -1365,23 +1368,23 @@ static int filewrite(char *str)
  *                     staging (referred to only)
  *                     stglen  (altered)
  */
-SC_FUNC void stgwrite(const char *st)
+SC_FUNC void stgwrite(const char *str)
 {
   int len;
-  int st_len=strlen(st);
+  int st_len=strlen(str);
 
   if (staging) {
     assert(stgidx==0 || stgbuf!=NULL);  /* staging buffer must be valid if there is (apparently) something in it */
     if (stgidx>=2 && stgbuf[stgidx-1]=='\0' && stgbuf[stgidx-2]!='\n')
       stgidx-=1;                        /* overwrite last '\0' */
     CHECK_STGBUFFER(stgidx+st_len+1);
-    memcpy(stgbuf+stgidx,st,st_len+1);  /* copy to staging buffer */
+    memcpy(stgbuf+stgidx,str,st_len+1); /* copy to staging buffer */
     stgidx+=st_len+1;
     stglen+=st_len;
   } else {
     len=(stgbuf!=NULL) ? stglen : 0;
     CHECK_STGBUFFER(len+st_len+1);
-    memcpy(stgbuf+len,st,st_len+1);
+    memcpy(stgbuf+len,str,st_len+1);
     len=len+st_len;
     stglen=len;
     if (len>0 && stgbuf[len-1]=='\n') {
@@ -1456,7 +1459,7 @@ typedef struct {
  *  by '[', sENDREORDER by ']' and sEXPRSTART by '|' the following applies:
  *     '[]...'     valid, but useless; no output
  *     '[|...]     valid, but useless; only one string
- *     '[|...|...] valid and usefull
+ *     '[|...|...] valid and useful
  *     '[...|...]  invalid, first string doesn't start with '|'
  *     '[|...|]    invalid
  */
@@ -1465,7 +1468,7 @@ static int stgstring(char *start,char *end)
   char *ptr;
   int nest,argc,arg;
   argstack *stack;
-  int reordered=0;
+  int reordered=FALSE;
 
   while (start<end) {
     if (*start==sSTARTREORDER) {
@@ -1474,7 +1477,7 @@ static int stgstring(char *start,char *end)
       stack=(argstack *)malloc(sMAXARGS*sizeof(argstack));
       if (stack==NULL)
         error(103);     /* insufficient memory */
-      reordered=1;      /* mark that the expression is reordered */
+      reordered=TRUE;   /* mark that the expression is reordered */
       nest=1;           /* nesting counter */
       argc=0;           /* argument counter */
       arg=-1;           /* argument index; no valid argument yet */
@@ -1527,7 +1530,7 @@ static int stgstring(char *start,char *end)
  *  Scraps code from the staging buffer by resetting "stgidx" to "index".
  *
  *  Global references: stgidx (altered)
- *                     staging (reffered to only)
+ *                     staging (referred to only)
  */
 SC_FUNC void stgdel(int index,cell code_index)
 {
@@ -1696,10 +1699,8 @@ static char *replacesequence(char *pattern,char symbols[MAX_OPT_VARS][MAX_ALIAS+
   } /* while */
 
   /* allocate a buffer to replace the sequence in */
-  if ((buffer=(char*)malloc(*repl_length))==NULL) {
+  if ((buffer=(char*)malloc(*repl_length))==NULL)
     error(103);
-    return NULL;
-  } /* if */
 
   /* replace the pattern into this temporary buffer */
   lptr=buffer;
@@ -1762,7 +1763,6 @@ static void stgopt(char *start,char *end,int (*outputfunc)(char *str))
   int matches;
   char *debut=start;  /* save original start of the buffer */
 
-  assert(sequences!=NULL);
   /* do not match anything if debug-level is maximum */
   if (pc_optimize>sOPTIMIZE_NONE && sc_status==statWRITE && emit_stgbuf_idx==-1) {
     do {
@@ -1807,7 +1807,7 @@ static void stgopt(char *start,char *end,int (*outputfunc)(char *str))
             seq++;
           } /* if */
         } /* while */
-        assert(sequences[seq].find==NULL || *sequences[seq].find=='\0' && pc_optimize==sOPTIMIZE_NOMACRO);
+        assert(sequences[seq].find==NULL || (*sequences[seq].find=='\0' && pc_optimize==sOPTIMIZE_NOMACRO));
         start += strlen(start) + 1;       /* to next string */
       } /* while (start<end) */
     } while (matches>0);

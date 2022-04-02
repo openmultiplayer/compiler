@@ -51,9 +51,10 @@ SC_VDEFINE char sc_ctrlchar=CTRL_CHAR;      /* the control character (or escape 
 SC_VDEFINE char sc_ctrlchar_org=CTRL_CHAR;  /* the default control character */
 SC_VDEFINE int litidx=0;                    /* index to literal table */
 SC_VDEFINE int litmax=sDEF_LITMAX;          /* current size of the literal table */
+SC_VDEFINE int litgrow=sDEF_LITMAX;         /* amount to increase the literal table by */
 SC_VDEFINE int stgidx=0;                    /* index to the staging buffer */
 SC_VDEFINE int sc_labnum=0;                 /* number of (internal) labels */
-SC_VDEFINE int staging=0;                   /* true if staging output */
+SC_VDEFINE int staging=FALSE;               /* true if staging output */
 SC_VDEFINE cell declared=0;                 /* number of local cells declared */
 SC_VDEFINE cell glb_declared=0;             /* number of global cells declared */
 SC_VDEFINE cell code_idx=0;                 /* number of bytes with generated code */
@@ -79,7 +80,8 @@ SC_VDEFINE symbol *line_sym=NULL;           /* the line number constant (__line)
 SC_VDEFINE short fnumber=0;                 /* the file number in the file table (debugging) */
 SC_VDEFINE short fcurrent=0;                /* current file being processed (debugging) */
 SC_VDEFINE short sc_intest=FALSE;           /* true if inside a test */
-SC_VDEFINE int pc_sideeffect=0;             /* true if an expression causes a side-effect */
+SC_VDEFINE int pc_sideeffect=FALSE;         /* true if an expression causes a side-effect */
+SC_VDEFINE int pc_ovlassignment=FALSE;      /* true if an expression contains an overloaded assignment */
 SC_VDEFINE int stmtindent=0;                /* current indent of the statement */
 SC_VDEFINE int indent_nowarn=FALSE;         /* skip warning "217 loose indentation" */
 SC_VDEFINE int sc_tabsize=8;                /* number of spaces that a TAB represents */
@@ -87,7 +89,7 @@ SC_VDEFINE short sc_allowtags=TRUE;         /* allow/detect tagnames in lex() */
 SC_VDEFINE int sc_status;                   /* read/write status */
 SC_VDEFINE int sc_rationaltag=0;            /* tag for rational numbers */
 SC_VDEFINE int rational_digits=0;           /* number of fractional digits */
-SC_VDEFINE int sc_allowproccall=0;          /* allow/detect tagnames in lex() */
+SC_VDEFINE int sc_allowproccall=FALSE;      /* allow/detect tagnames in lex() */
 SC_VDEFINE short sc_is_utf8=FALSE;          /* is this source file in UTF-8 encoding */
 SC_VDEFINE char *pc_deprecate=NULL;         /* if non-null, mark next declaration as deprecated */
 SC_VDEFINE int sc_curstates=0;              /* ID of the current state list */
@@ -96,6 +98,33 @@ SC_VDEFINE int pc_memflags=0;               /* special flags for the stack/heap 
 SC_VDEFINE int pc_naked=FALSE;              /* if true mark following function as naked */
 SC_VDEFINE int pc_compat=FALSE;             /* running in compatibility mode? */
 SC_VDEFINE int pc_recursion=FALSE;          /* enable detailed recursion report? */
+SC_VDEFINE int pc_retexpr=FALSE;            /* true if the current expression is a part of a "return" statement */
+SC_VDEFINE int pc_retheap=0;                /* heap space (in bytes) to be manually freed when returning an array returned by another function */
+SC_VDEFINE int pc_nestlevel=0;              /* number of active (open) compound statements */
+SC_VDEFINE unsigned int pc_attributes=0;    /* currently set attribute flags (for the "__pragma" operator) */
+SC_VDEFINE int pc_ispackedstr=FALSE;        /* true if the last tokenized string is packed */
+SC_VDEFINE int pc_isrecording=FALSE;        /* true if recording input */
+SC_VDEFINE char *pc_recstr=NULL;            /* recorded input */
+SC_VDEFINE int pc_loopcond=FALSE;           /* true if the current expression is a loop condition */
+SC_VDEFINE int pc_numloopvars=0;            /* number of variables used inside a loop condition */
+
+SC_VDEFINE char *sc_tokens[] = {
+  "*=", "/=", "%=", "+=", "-=", "<<=", ">>>=", ">>=", "&=", "^=", "|=",
+  "||", "&&", "==", "!=", "<=", ">=", "<<", ">>>", ">>", "++", "--",
+  "...", "..",
+  "__addressof", "assert", "*begin", "break", "case", "char", "const", "continue",
+  "default", "defined", "do", "else", "__emit", "*end", "enum", "exit", "for",
+  "forward", "goto", "if", "__nameof", "native", "new", "operator", "__pragma",
+  "public", "return", "sizeof", "sleep", "state", "static", "__static_assert",
+  "__static_check", "stock", "switch", "tagof", "*then", "while",
+  "#assert", "#define", "#else", "#elseif", "#emit", "#endif", "#endinput",
+  "#endscript", "#error", "#file", "#if", "#include", "#line", "#pragma",
+  "#tryinclude", "#undef", "#warning",
+  ";", ";", "-integer value-", "-rational value-", "-identifier-",
+  "-label-", "-string-",
+  "-any value-", "-numeric value-", "-data offset-", "-local variable-",
+  "-reference-", "-function-", "-native function-", "-nonnegative integer-"
+};
 
 SC_VDEFINE constvalue_root sc_automaton_tab = { NULL, NULL}; /* automaton table */
 SC_VDEFINE constvalue_root sc_state_tab = { NULL, NULL};   /* state table */

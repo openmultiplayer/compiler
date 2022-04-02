@@ -37,7 +37,7 @@ static int fcurseg;     /* the file number (fcurrent) for the active segment */
 /* When a subroutine returns to address 0, the AMX must halt. In earlier
  * releases, the RET and RETN opcodes checked for the special case 0 address.
  * Today, the compiler simply generates a HALT instruction at address 0. So
- * a subroutine can savely return to 0, and then encounter a HALT.
+ * a subroutine can safely return to 0, and then encounter a HALT.
  */
 SC_FUNC void writeleader(symbol *root)
 {
@@ -129,7 +129,7 @@ SC_FUNC void writeleader(symbol *root)
       strcpy(lbl_default,itoh(lbl_nostate));
       for (stlist=sym->states->first; stlist!=NULL; stlist=stlist->next) {
         if (stlist->index==-1) {
-          assert(strlen(stlist->name)<sizeof lbl_default);
+          assert(strlen(stlist->name)<arraysize(lbl_default));
           strcpy(lbl_default,stlist->name);
         } else {
           statecount+=state_count(stlist->index);
@@ -381,7 +381,7 @@ SC_FUNC void alignframe(int numbytes)
     /* "numbytes" should be a power of 2 for this code to work */
     int i,count=0;
     for (i=0; i<sizeof numbytes*8; i++)
-      if (numbytes & (1 << i))
+      if ((unsigned)numbytes & (1U << i))
         count++;
     assert(count==1);
   #endif
@@ -836,7 +836,7 @@ SC_FUNC void defstorage(void)
  *  Same as defstorage() but for repeating values.
  */
 
-SC_FUNC void defcompactstorage()
+SC_FUNC void defcompactstorage(void)
 {
   stgwrite("dumpn ");
 }
@@ -1246,6 +1246,8 @@ SC_FUNC void inc(value *lval)
   symbol *sym;
 
   sym=lval->sym;
+  if (sym!=NULL)
+    markusage(sym,uWRITTEN);
   if (lval->ident==iARRAYCELL) {
     /* indirect increment, address already in PRI */
     stgwrite("\tinc.i\n");
@@ -1304,6 +1306,8 @@ SC_FUNC void dec(value *lval)
   symbol *sym;
 
   sym=lval->sym;
+  if (sym!=NULL)
+    markusage(sym,uWRITTEN);
   if (lval->ident==iARRAYCELL) {
     /* indirect decrement, address already in PRI */
     stgwrite("\tdec.i\n");

@@ -109,9 +109,6 @@
   #endif
 #endif
 
-#if !defined arraysize
-  #define arraysize(array)  (sizeof(array) / sizeof((array)[0]))
-#endif
 
 #if !defined assert_static
   #if (defined __STDC_VERSION__ && __STDC_VERSION__ >= 201112) || GCC_VERSION >= 40600 || __clang__

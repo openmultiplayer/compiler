@@ -34,11 +34,20 @@ f5(arr[][]) { // line 30
 f6(arr[][]) {
 	arr[0][0] = 0;
 }
+f7(arr1[], arr2[], arr3[], arr4[]) {
+	++arr1[0];
+	--arr2[0];
+	arr3[0]++;
+	arr4[0]--;
+}
+f8(arr[]) {
+	++arr[0];
+}
 
 main () {
-	f0("test"); // line 39
-	f1("test"); // line 40
-	f2("test"); // line 41
+	f0("test"); // line 48
+	f1("test"); // line 49
+	f2("test"); // line 50
 	f3("test");
 	f4("test");
 
@@ -56,6 +65,9 @@ main () {
 	new arr2[1][1];
 	f5(arr2);
 	f6(arr2);
+
+	f7(arr, arr, arr, arr);
+	f8("hi");
 
 	SetTimer("test", 0, 0);
 }

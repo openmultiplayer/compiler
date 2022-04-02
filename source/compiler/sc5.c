@@ -43,7 +43,7 @@ static char *errmsg[] = {
 /*001*/  "expected token: \"%s\", but found \"%s\"\n",
 /*002*/  "only a single statement (or expression) can follow each \"case\"\n",
 /*003*/  "declaration of a local variable must appear in a compound block\n",
-/*004*/  "function \"%s\" is not implemented\n",
+/*004*/  "function \"%s\" is not implemented %s\n",
 /*005*/  "function may not have arguments\n",
 /*006*/  "must be assigned to an array\n",
 /*007*/  "operator cannot be redefined\n",
@@ -65,7 +65,7 @@ static char *errmsg[] = {
 /*023*/  "array assignment must be simple assignment\n",
 /*024*/  "\"break\" or \"continue\" is out of context\n",
 /*025*/  "function heading differs from prototype\n",
-/*026*/  "no matching \"#if...\"\n",
+/*026*/  "no matching \"%s\"\n",
 /*027*/  "invalid character constant\n",
 /*028*/  "invalid subscript (not an array or too many subscripts): \"%s\"\n",
 /*029*/  "invalid expression, assumed zero\n",
@@ -95,7 +95,7 @@ static char *errmsg[] = {
 /*053*/  "exceeding maximum number of dimensions\n",
 /*054*/  "unmatched closing brace (\"}\")\n",
 /*055*/  "start of function body without function header\n",
-/*056*/  "arrays, local variables and function arguments cannot be public (variable \"%s\")\n",
+/*056*/  "arrays, local variables, function arguments and user-defined operators cannot be public (symbol \"%s\")\n",
 /*057*/  "unfinished expression before compiler directive\n",
 /*058*/  "duplicate argument; same argument is passed twice\n",
 /*059*/  "function argument may not have a default value (variable \"%s\")\n",
@@ -132,7 +132,8 @@ static char *errmsg[] = {
 /*090*/  "public functions may not return arrays (symbol \"%s\")\n",
 /*091*/  "ambiguous constant; tag override is required (symbol \"%s\")\n",
 /*092*/  "functions may not return arrays of unknown size (symbol \"%s\")\n",
-/*093*/  "\"__addressof\" operator is invalid in preprocessor expressions\n"
+/*093*/  "\"__addressof\" operator is invalid in preprocessor expressions\n",
+/*094*/  "division by zero\n"
 };
 
 static char *fatalmsg[] = {
@@ -175,7 +176,7 @@ static char *warnmsg[] = {
 /*215*/  "expression has no effect\n",
 /*216*/  "nested comment\n",
 /*217*/  "loose indentation\n",
-/*218*/  "old style prototypes used with optional semicolumns\n",
+/*218*/  "old style prototypes used with optional semicolons\n",
 /*219*/  "local variable \"%s\" shadows a variable at a preceding level\n",
 /*220*/  "expression with tag override must appear between parentheses\n",
 /*221*/  "label name \"%s\" shadows tag name\n",
@@ -196,15 +197,28 @@ static char *warnmsg[] = {
 /*236*/  "unknown parameter in substitution (incorrect #define pattern)\n",
 /*237*/  "user warning: %s\n",
 /*238*/  "meaningless combination of class specifiers (%s)\n",
-/*239*/  "literal array/string passed to a non-const parameter\n"
+/*239*/  "literal array/string passed to a non-const parameter\n",
+/*240*/  "previously assigned value is never used (symbol \"%s\")\n",
+/*241*/  "negative or too big shift count\n",
+/*242*/  "shift overflow in enum element declaration (symbol \"%s\")\n",
+/*243*/  "redundant code: switch control expression is constant\n",
+/*244*/  "enum element \"%s\" not handled in switch\n",
+/*245*/  "enum increment \"%s %d\" has no effect on zero value (symbol \"%s\")\n",
+/*246*/  "multiplication overflow in enum element declaration (symbol \"%s\")\n",
+/*247*/  "use of operator \"%s\" on %s\n",
+/*248*/  "possible misuse of comma operator\n",
+/*249*/  "check failed: %s\n",
+/*250*/  "variable \"%s\" used in loop condition not modified in loop body\n",
+/*251*/  "none of the variables used in loop condition are modified in loop body\n"
 };
 
 static char *noticemsg[] = {
 /*001*/  "; did you mean \"%s\"?\n",
-/*002*/  "; state variable out of scope\n"
+/*002*/  "; state variable out of scope\n",
+/*003*/  "; did you mean to use operator \"%s\"?\n"
 };
 
-#define NUM_WARNINGS    (sizeof warnmsg / sizeof warnmsg[0])
+#define NUM_WARNINGS    arraysize(warnmsg)
 static struct s_warnstack {
   unsigned char disable[(NUM_WARNINGS + 7) / 8]; /* 8 flags in a char */
   struct s_warnstack *next;
@@ -219,12 +233,12 @@ static int errwarn;
  *
  *  Outputs an error message (note: msg is passed optionally).
  *  If an error is found, the variable "errflag" is set and subsequent
- *  errors are ignored until lex() finds a semicolumn or a keyword
+ *  errors are ignored until lex() finds a semicolon or a keyword
  *  (lex() resets "errflag" in that case).
  *
- *  Global references: inpfname   (reffered to only)
- *                     fline      (reffered to only)
- *                     fcurrent   (reffered to only)
+ *  Global references: inpfname   (referred to only)
+ *                     fline      (referred to only)
+ *                     fcurrent   (referred to only)
  *                     errflag    (altered)
  */
 SC_FUNC int error(long number,...)
@@ -235,7 +249,7 @@ static short lastfile;
   char *msg,*pre;
   va_list argptr;
   char string[128];
-  int notice;
+  int notice,start;
 
   /* split the error field between the real error/warning number and an optional
    * "notice" number
@@ -261,46 +275,46 @@ static short lastfile;
   } /* if */
 
   if (number<100) {
-    assert(number>0 && number<(1+sizeof(errmsg)/sizeof(errmsg[0])));
+    assert(number>0 && number<(1+arraysize(errmsg)));
     msg=errmsg[number-1];
     pre=prefix[0];
     errflag=TRUE;       /* set errflag (skip rest of erroneous expression) */
     errnum++;
   } else if (number<200) {
-    assert(number>=100 && number<(100+sizeof(fatalmsg)/sizeof(fatalmsg[0])));
+    assert(number>=100 && number<(100+arraysize(fatalmsg)));
     msg=fatalmsg[number-100];
     pre=prefix[1];
     errnum++;           /* a fatal error also counts as an error */
   } else if (errwarn) {
-    assert(number>=200 && number<(200+sizeof(warnmsg)/sizeof(warnmsg[0])));
+    assert(number>=200 && number<(200+arraysize(warnmsg)));
     msg=warnmsg[number-200];
     pre=prefix[0];
     errflag=TRUE;
     errnum++;
   } else {
-    assert(number>=200 && number<(200+sizeof(warnmsg)/sizeof(warnmsg[0])));
+    assert(number>=200 && number<(200+arraysize(warnmsg)));
     msg=warnmsg[number-200];
     pre=prefix[2];
     warnnum++;
   } /* if */
 
   if (notice!=0) {
-    assert(notice>0 && notice<(1+sizeof(noticemsg)/sizeof(noticemsg[0])) && noticemsg[notice-1][0]!='\0');
+    assert(notice>0 && notice<(1+arraysize(noticemsg)) && noticemsg[notice-1][0]!='\0');
     strcpy(string,msg);
     strcpy(&string[strlen(string)-1],noticemsg[notice-1]);
     msg=string;
   } /* if */
 
   assert(errstart<=fline);
+  start=errstart;
   if (errline>0)
-    errstart=errline;
+    start=errline;
   else
     errline=fline;
-  assert(errstart<=errline);
+  assert(start<=errline);
   va_start(argptr,number);
   if (errfname[0]=='\0') {
-    int start=(errstart==errline) ? -1 : errstart;
-    if (pc_error((int)number,msg,inpfname,start,errline,argptr)) {
+    if (pc_error((int)number,msg,inpfname,((start==errline) ? -1 : start),errline,argptr)) {
       if (outf!=NULL) {
         pc_closeasm(outf,TRUE);
         outf=NULL;
@@ -310,8 +324,11 @@ static short lastfile;
   } else {
     FILE *fp=fopen(errfname,"a");
     if (fp!=NULL) {
-      if (errstart>=0 && errstart!=errline)
-        fprintf(fp,"%s(%d -- %d) : %s %03d: ",inpfname,errstart,errline,pre,(int)number);
+      /* don't use `fatal error 111: user error:` redundant prefix */
+      if (number==111 || number==237)
+        fprintf(fp,"%s(%d) : ",inpfname,errline);
+      if (start>=0 && start!=errline)
+        fprintf(fp,"%s(%d -- %d) : %s %03d: ",inpfname,start,errline,pre,(int)number);
       else
         fprintf(fp,"%s(%d) : %s %03d: ",inpfname,errline,pre,(int)number);
       vfprintf(fp,msg,argptr);
@@ -335,7 +352,7 @@ static short lastfile;
 
   errline=-1;
   /* check whether we are seeing many errors on the same line */
-  if ((errstart<0 && lastline!=fline) || lastline<errstart || lastline>fline || fcurrent!=lastfile)
+  if ((start<0 && lastline!=fline) || lastline<start || lastline>fline || fcurrent!=lastfile)
     errorcount=0;
   lastline=fline;
   lastfile=fcurrent;
@@ -379,7 +396,7 @@ SC_FUNC void errorset(int code,int line)
  *  o  1 for enable
  *  o  2 for toggle
  */
-int pc_enablewarning(int number,int enable)
+int pc_enablewarning(int number,warnmode enable)
 {
   int index;
   unsigned char mask;
@@ -393,13 +410,13 @@ int pc_enablewarning(int number,int enable)
   index=number/8;
   mask=(unsigned char)(1 << (number%8));
   switch (enable) {
-  case 0:
+  case warnDISABLE:
     warnstack.disable[index] |= mask;
     break;
-  case 1:
+  case warnENABLE:
     warnstack.disable[index] &= (unsigned char)~mask;
     break;
-  case 2:
+  case warnTOGGLE:
     warnstack.disable[index] ^= mask;
     break;
   } /* switch */
@@ -410,31 +427,46 @@ int pc_enablewarning(int number,int enable)
 /* pc_pushwarnings()
  * Saves currently disabled warnings, used to implement #pragma warning push
  */
-int pc_pushwarnings()
+void pc_pushwarnings(void)
 {
   void *p;
   p=calloc(sizeof(struct s_warnstack),1);
-  if (p==NULL) {
+  if (p==NULL)
     error(103); /* insufficient memory */
-    return FALSE;
-  }
   memmove(p,&warnstack,sizeof(struct s_warnstack));
   warnstack.next=p;
-  return TRUE;
 }
 
 /* pc_popwarnings()
  * This function is the reverse of pc_pushwarnings()
  */
-int pc_popwarnings()
+void pc_popwarnings(void)
 {
   void *p;
-  if (warnstack.next==NULL)
-    return FALSE; /* nothing to do */
+  if (warnstack.next==NULL) {
+    error(26,"#pragma warning push");   /* no matching "#pragma warning push" */
+    return;                             /* nothing to do */
+  } /* if */
   p=warnstack.next;
   memmove(&warnstack,p,sizeof(struct s_warnstack));
   free(p);
-  return TRUE;
+}
+
+SC_FUNC void warnstack_init(void)
+{
+  memset(&warnstack,0,sizeof(warnstack));
+}
+
+SC_FUNC void warnstack_cleanup(void)
+{
+  struct s_warnstack *cur,*next;
+  if (warnstack.next!=NULL)
+    error(1,"#pragma warning pop","-end of file-");
+  for (cur=warnstack.next; cur!=NULL; cur=next) {
+    next=cur->next;
+    free(cur);
+  } /* for */
+  warnstack.next=NULL;
 }
 
 /* pc_seterrorwarnings()
@@ -445,7 +477,7 @@ void pc_seterrorwarnings(int enable)
   errwarn = enable;
 }
 
-int pc_geterrorwarnings()
+int pc_geterrorwarnings(void)
 {
   return errwarn;
 }
@@ -674,7 +706,6 @@ SC_FUNC int error_suggest(int number,const char *name,const char *name2,int type
     } /* if */
   } else if (type==estNONSYMBOL) {
     if (tMIDDLE<subtype && subtype<=tLAST) {
-      extern char *sc_tokens[];
       name=sc_tokens[subtype-tFIRST];
       subtype=esfVARCONST;
       goto find_symbol;
