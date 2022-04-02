@@ -289,9 +289,6 @@ typedef enum {
   OP_CONST,
   OP_CONST_S,
   /* ----- */
-  OP_SYSREQ_D,
-  OP_SYSREQ_ND,
-  /* ----- */
   OP_NUM_OPCODES
 } OPCODE;
 
@@ -473,37 +470,6 @@ int AMXAPI amx_Callback(AMX *amx, cell index, cell *result, const cell *params)
 #endif
   assert(f!=NULL);
 
-  /* Now that we have found the function, patch the program so that any
-   * subsequent call will call the function directly (bypassing this
-   * callback).
-   * This trick cannot work in the JIT, because the program would need to
-   * be re-JIT-compiled after patching a P-code instruction.
-   */
-  #if defined JIT && !defined NDEBUG
-    if ((amx->flags & AMX_FLAG_JITC)!=0)
-      assert(amx->sysreq_d==0);
-  #endif
-  if (amx->sysreq_d!=0) {
-    /* at the point of the call, the CIP pseudo-register points directly
-     * behind the SYSREQ instruction and its parameter(s)
-     */
-    unsigned char *code=amx->base+(int)hdr->cod+(int)amx->cip-sizeof(cell);
-    assert(amx->cip >= 4 && amx->cip < (hdr->dat - hdr->cod));
-    assert_static(sizeof(f)<=sizeof(cell)); /* function pointer must fit in a cell */
-    if (amx->flags & AMX_FLAG_SYSREQN)		/* SYSREQ.N has 2 parameters */
-      code-=sizeof(cell);
-#if defined __GNUC__ || defined __ICC || defined ASM32
-    if (*(cell*)code==index) {
-#else
-    if (*(cell*)code!=OP_SYSREQ_PRI) {
-      assert(*(cell*)(code-sizeof(cell))==OP_SYSREQ_C || *(cell*)(code-sizeof(cell))==OP_SYSREQ_N);
-      assert(*(cell*)code==index);
-#endif
-      *(cell*)(code-sizeof(cell))=amx->sysreq_d;
-      *(cell*)code=(cell)f;
-    } /* if */
-  } /* if */
-
   /* Note:
    *   params[0] == number of bytes for the additional parameters passed to the native function
    *   params[1] == first argument
@@ -571,7 +537,6 @@ static int amx_BrowseRelocate(AMX *amx)
   assert_static(OP_SYMBOL==126);
   assert_static(OP_LOAD_BOTH==154);
 
-  amx->sysreq_d=0;      /* preset */
   sysreq_flg=0;
   #if defined __GNUC__ || defined __ICC || defined ASM32 || defined JIT
     amx_Exec(amx, (cell*)(void*)&opcode_list, 0);
@@ -828,28 +793,6 @@ static int amx_BrowseRelocate(AMX *amx)
   } /* for */
 
   assert(sysreq_flg==0 || sysreq_flg==0x01 || sysreq_flg==0x02);
-  #if !defined AMX_DONT_RELOCATE
-    if (sysreq_flg==0x01 || sysreq_flg==0x02) {
-      /* only either type of system request opcode should be found (otherwise,
-       * we probably have a non-conforming compiler
-       */
-      #if (defined __GNUC__ || defined __ICC || defined ASM32 || defined JIT) && !defined __64BIT__
-        /* to use direct system requests, a function pointer must fit in a cell;
-         * because the native function's address will be stored as the parameter
-         * of SYSREQ.D
-         */
-        if ((amx->flags & AMX_FLAG_JITC)==0 && sizeof(AMX_NATIVE)<=sizeof(cell))
-          amx->sysreq_d=(sysreq_flg==0x01) ? opcode_list[OP_SYSREQ_D] : opcode_list[OP_SYSREQ_ND];
-      #else
-        /* ANSI C
-         * to use direct system requests, a function pointer must fit in a cell;
-         * see the comment above
-         */
-        if (sizeof(AMX_NATIVE)<=sizeof(cell))
-          amx->sysreq_d=(sysreq_flg==0x01) ? OP_SYSREQ_D : OP_SYSREQ_ND;
-      #endif
-    } /* if */
-  #endif
 
   #if defined JIT
     amx->code_size = getMaxCodeSize()*opcode_count + hdr->cod
@@ -1906,7 +1849,7 @@ static const void * const amx_opcodelist[] = {
         &&op_push3_s,   &&op_push3_adr, &&op_push4_c,   &&op_push4,
         &&op_push4_s,   &&op_push4_adr, &&op_push5_c,   &&op_push5,
         &&op_push5_s,   &&op_push5_adr, &&op_load_both, &&op_load_s_both,
-        &&op_const,     &&op_const_s,   &&op_sysreq_d,  &&op_sysreq_nd };
+        &&op_const,     &&op_const_s };
   AMX_HEADER *hdr;
   AMX_FUNCPART *func;
   unsigned char *code, *data;
@@ -2946,51 +2889,6 @@ static const void * const amx_opcodelist[] = {
     GETPARAM(offs);
     GETPARAM(val);
     _W(data,frm+offs,val);
-    NEXT(cip);
-#endif
-#if !defined AMX_NO_MACRO_INSTR
-  op_sysreq_d:          /* see op_sysreq_c */
-    GETPARAM(offs);
-    /* save a few registers */
-    amx->cip=(cell)((unsigned char *)cip-code);
-    amx->hea=hea;
-    amx->frm=frm;
-    amx->stk=stk;
-    pri=((AMX_NATIVE)offs)(amx,(cell *)(data+(int)stk));
-    if (amx->error!=AMX_ERR_NONE) {
-      if (amx->error==AMX_ERR_SLEEP) {
-        amx->pri=pri;
-        amx->alt=alt;
-        amx->reset_stk=reset_stk;
-        amx->reset_hea=reset_hea;
-        return AMX_ERR_SLEEP;
-      } /* if */
-      ABORT(amx,amx->error);
-    } /* if */
-    NEXT(cip);
-#endif
-#if !defined AMX_NO_MACRO_INSTR && !defined AMX_NO_MACRO_INSTR
-  op_sysreq_nd:    /* see op_sysreq_n */
-    GETPARAM(offs);
-    GETPARAM(val);
-    PUSH(val);
-    /* save a few registers */
-    amx->cip=(cell)((unsigned char *)cip-code);
-    amx->hea=hea;
-    amx->frm=frm;
-    amx->stk=stk;
-    pri=((AMX_NATIVE)offs)(amx,(cell *)(data+(int)stk));
-    stk+=val+4;
-    if (amx->error!=AMX_ERR_NONE) {
-      if (amx->error==AMX_ERR_SLEEP) {
-        amx->pri=pri;
-        amx->alt=alt;
-        amx->reset_stk=reset_stk;
-        amx->reset_hea=reset_hea;
-        return AMX_ERR_SLEEP;
-      } /* if */
-      ABORT(amx,amx->error);
-    } /* if */
     NEXT(cip);
 #endif
 }
@@ -4141,51 +4039,6 @@ int AMXAPI amx_Exec(AMX *amx, cell *retval, int index)
       GETPARAM(offs);
       GETPARAM(val);
       _W32(data,frm+offs,val);
-      break;
-#endif
-#if !defined AMX_DONT_RELOCATE
-    case OP_SYSREQ_D: /* see OP_SYSREQ_C */
-      GETPARAM(offs);
-      /* save a few registers */
-      amx->cip=(cell)((unsigned char *)cip-code);
-      amx->hea=hea;
-      amx->frm=frm;
-      amx->stk=stk;
-      pri=((AMX_NATIVE)offs)(amx,(cell *)(data+(int)stk));
-      if (amx->error!=AMX_ERR_NONE) {
-        if (amx->error==AMX_ERR_SLEEP) {
-          amx->pri=pri;
-          amx->alt=alt;
-          amx->reset_stk=reset_stk;
-          amx->reset_hea=reset_hea;
-          return AMX_ERR_SLEEP;
-        } /* if */
-        ABORT(amx,amx->error);
-      } /* if */
-      break;
-#endif
-#if !defined AMX_NO_MACRO_INSTR && !defined AMX_DONT_RELOCATE
-    case OP_SYSREQ_ND:    /* see SYSREQ_N */
-      GETPARAM(offs);
-      GETPARAM(val);
-      PUSH(val);
-      /* save a few registers */
-      amx->cip=(cell)((unsigned char *)cip-code);
-      amx->hea=hea;
-      amx->frm=frm;
-      amx->stk=stk;
-      pri=((AMX_NATIVE)offs)(amx,(cell *)(data+(int)stk));
-      stk+=val+4;
-      if (amx->error!=AMX_ERR_NONE) {
-        if (amx->error==AMX_ERR_SLEEP) {
-          amx->pri=pri;
-          amx->alt=alt;
-          amx->reset_stk=reset_stk;
-          amx->reset_hea=reset_hea;
-          return AMX_ERR_SLEEP;
-        } /* if */
-        ABORT(amx,amx->error);
-      } /* if */
       break;
 #endif
     default:
