@@ -1645,7 +1645,7 @@ int AMXAPI amx_Register(AMX *amx, const AMX_NATIVE_INFO *list, int number)
       /* this function is not yet located */
       funcptr=(list!=NULL) ? findfunction(GETENTRYNAME(hdr,func),list,number) : NULL;
       if (funcptr!=NULL)
-        func->address=(ucell)funcptr;
+        ((AMX_FUNCWIDE *)func)->address=funcptr;
       else
         err=AMX_ERR_NOTFOUND;
     } /* if */
