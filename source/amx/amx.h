@@ -275,6 +275,14 @@ typedef struct tagFUNCSTUBNT {
   uint32_t nameofs      PACKED;
 } AMX_FUNCSTUBNT;
 
+typedef struct tagFUNCPART {
+  ucell address         PACKED;
+} AMX_FUNCPART;
+
+typedef struct tagFUNCWIDE {
+  AMX_NATIVE address    PACKED;
+} AMX_FUNCWIDE;
+
 /* The AMX structure is the internal structure for many functions. Not all
  * fields are valid at all times; many fields are cached in local variables.
  */
