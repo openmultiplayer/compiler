@@ -358,6 +358,28 @@ typedef struct tagAMX_HEADER {
   #define AMX_MAGIC     AMX_MAGIC_64
 #endif
 
+#define USENAMETABLE(hdr) \
+                        ((hdr)->defsize==sizeof(AMX_FUNCSTUBNT))
+#define NUMENTRIES(hdr,field,nextfield) \
+                        (unsigned)(((hdr)->nextfield - (hdr)->field) / (hdr)->defsize)
+#define GETENTRY(hdr,table,index) \
+                        (AMX_FUNCPART *)((unsigned char*)(hdr) + (unsigned)(hdr)->table + (unsigned)index*(hdr)->defsize)
+#define GETENTRYNAME(hdr,entry) \
+                        ( USENAMETABLE(hdr) \
+                           ? (char *)((unsigned char*)(hdr) + (unsigned)((AMX_FUNCSTUBNT*)(entry))->nameofs) \
+                           : ((AMX_FUNCSTUB*)(entry))->name )
+
+#define CHARBITS        (8*sizeof(char))
+#if PAWN_CELL_SIZE==16
+  #define CHARMASK      (0xffffu << 8*(2-sizeof(char)))
+#elif PAWN_CELL_SIZE==32
+  #define CHARMASK      (0xffffffffuL << 8*(4-sizeof(char)))
+#elif PAWN_CELL_SIZE==64
+  #define CHARMASK      (0xffffffffffffffffuLL << 8*(8-sizeof(char)))
+#else
+  #error Unsupported cell size
+#endif
+
 enum {
   AMX_ERR_NONE,
   /* reserve the first 15 error codes for exit codes of the abstract machine */
