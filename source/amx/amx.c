@@ -292,17 +292,6 @@ typedef enum {
   OP_NUM_OPCODES
 } OPCODE;
 
-#define USENAMETABLE(hdr) \
-                        ((hdr)->defsize==sizeof(AMX_FUNCSTUBNT))
-#define NUMENTRIES(hdr,field,nextfield) \
-                        (unsigned)(((hdr)->nextfield - (hdr)->field) / (hdr)->defsize)
-#define GETENTRY(hdr,table,index) \
-                        (AMX_FUNCPART *)((unsigned char*)(hdr) + (unsigned)(hdr)->table + (unsigned)index*(hdr)->defsize)
-#define GETENTRYNAME(hdr,entry) \
-                        ( USENAMETABLE(hdr) \
-                           ? (char *)((unsigned char*)(hdr) + (unsigned)((AMX_FUNCSTUBNT*)(entry))->nameofs) \
-                           : ((AMX_FUNCSTUB*)(entry))->name )
-
 #if !defined NDEBUG
   static int check_endian(void)
   {
@@ -4138,17 +4127,6 @@ int AMXAPI amx_Release(AMX *amx,cell amx_addr)
 #endif /* AMX_ALLOT */
 
 #if defined AMX_XXXSTRING || defined AMX_UTF8XXX
-
-#define CHARBITS        (8*sizeof(char))
-#if PAWN_CELL_SIZE==16
-  #define CHARMASK      (0xffffu << 8*(2-sizeof(char)))
-#elif PAWN_CELL_SIZE==32
-  #define CHARMASK      (0xffffffffuL << 8*(4-sizeof(char)))
-#elif PAWN_CELL_SIZE==64
-  #define CHARMASK      (0xffffffffffffffffuLL << 8*(8-sizeof(char)))
-#else
-  #error Unsupported cell size
-#endif
 
 int AMXAPI amx_StrLen(const cell *cstr, int *length)
 {
