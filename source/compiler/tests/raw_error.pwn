@@ -1,6 +1,0 @@
-#error "raw error\"
-
-main()
-{
-}
-

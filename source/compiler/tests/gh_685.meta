@@ -1,7 +1,0 @@
-{
-  'test_type': 'output_check',
-  'errors': """
-gh_685.pwn(1) : error 010: invalid function or declaration
-gh_685.pwn(2) : error 010: invalid function or declaration
-  """
-}

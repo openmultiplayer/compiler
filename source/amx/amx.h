@@ -109,6 +109,9 @@
   #endif
 #endif
 
+#if !defined arraysize
+  #define arraysize(array)  (sizeof(array) / sizeof((array)[0]))
+#endif
 
 #if !defined assert_static
   #if (defined __STDC_VERSION__ && __STDC_VERSION__ >= 201112) || GCC_VERSION >= 40600 || __clang__
@@ -260,9 +263,7 @@ typedef struct tagAMX_NATIVE_INFO {
 #define AMX_USERNUM     4
 #endif
 #define sEXPMAX         19      /* maximum name length for file version <= 6 */
-#ifndef sNAMEMAX
-  #define sNAMEMAX      31      /* maximum name length of symbol name */
-#endif
+#define sNAMEMAX        31      /* maximum name length of symbol name */
 
 typedef struct tagAMX_FUNCSTUB {
   ucell address         PACKED;
@@ -273,14 +274,6 @@ typedef struct tagFUNCSTUBNT {
   ucell address         PACKED;
   uint32_t nameofs      PACKED;
 } AMX_FUNCSTUBNT;
-
-typedef struct tagFUNCPART {
-  ucell address         PACKED;
-} AMX_FUNCPART;
-
-typedef struct tagFUNCWIDE {
-  AMX_NATIVE address    PACKED;
-} AMX_FUNCWIDE;
 
 /* The AMX structure is the internal structure for many functions. Not all
  * fields are valid at all times; many fields are cached in local variables.
@@ -353,28 +346,6 @@ typedef struct tagAMX_HEADER {
   #define AMX_MAGIC     AMX_MAGIC_32
 #elif PAWN_CELL_SIZE==64
   #define AMX_MAGIC     AMX_MAGIC_64
-#endif
-
-#define USENAMETABLE(hdr) \
-                        ((hdr)->defsize==sizeof(AMX_FUNCSTUBNT))
-#define NUMENTRIES(hdr,field,nextfield) \
-                        (unsigned)(((hdr)->nextfield - (hdr)->field) / (hdr)->defsize)
-#define GETENTRY(hdr,table,index) \
-                        (AMX_FUNCPART *)((unsigned char*)(hdr) + (unsigned)(hdr)->table + (unsigned)index*(hdr)->defsize)
-#define GETENTRYNAME(hdr,entry) \
-                        ( USENAMETABLE(hdr) \
-                           ? (char *)((unsigned char*)(hdr) + (unsigned)((AMX_FUNCSTUBNT*)(entry))->nameofs) \
-                           : ((AMX_FUNCSTUB*)(entry))->name )
-
-#define CHARBITS        (8*sizeof(char))
-#if PAWN_CELL_SIZE==16
-  #define CHARMASK      (0xffffu << 8*(2-sizeof(char)))
-#elif PAWN_CELL_SIZE==32
-  #define CHARMASK      (0xffffffffuL << 8*(4-sizeof(char)))
-#elif PAWN_CELL_SIZE==64
-  #define CHARMASK      (0xffffffffffffffffuLL << 8*(8-sizeof(char)))
-#else
-  #error Unsupported cell size
 #endif
 
 enum {

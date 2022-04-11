@@ -86,12 +86,10 @@ Parallel installation is supported.
 
 If you are a [sampctl][sampctl] user, you are already using this compiler!
 
-### Building from Source
+### Build From Source
 
-If you are interested in contributing then please first read
-[this document][contributing] and ensure you have discussed your proposed
-changes before writing any code. Check out [this page][build_source] for
-instructions for compiling for your platform.
+If you are interested in contributing or just using a specific version, check
+out [this page][build_source] for instructions for compiling for your platform.
 
 ## Background
 
@@ -123,7 +121,5 @@ seems to be based on an older release of Pawn.
 [artifacts]:
   https://ci.appveyor.com/project/Southclaws/compiler/branch/master/artifacts
 [compat]: https://github.com/pawn-lang/compiler/wiki/Compatibility-mode
-[sampctl]: https://github.com/Southclaws/sampctl
-[contributing]:
-  https://github.com/pawn-lang/compiler/tree/master/.github/CONTRIBUTING.md
+[sampctl]: http://bit.ly/sampctl
 [build_source]: https://github.com/pawn-lang/compiler/wiki/Building-From-Source

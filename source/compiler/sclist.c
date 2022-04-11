@@ -44,8 +44,7 @@
 SC_FUNC char* duplicatestring(const char* sourcestring)
 {
   char* result=(char*)malloc(strlen(sourcestring)+1);
-  if (result!=NULL)
-    strcpy(result,sourcestring);
+  strcpy(result,sourcestring);
   return result;
 }
 
@@ -314,7 +313,7 @@ SC_FUNC void delete_substtable(void)
 {
   int i;
   delete_stringpairtable(&substpair);
-  for (i=0; i<arraysize(substindex); i++)
+  for (i=0; i<sizeof substindex/sizeof substindex[0]; i++)
     substindex[i]=NULL;
 }
 
@@ -443,7 +442,7 @@ SC_FUNC stringlist *insert_dbgfile(const char *filename)
   if (sc_status==statWRITE && (sc_debug & sSYMBOLIC)!=0) {
     char string[_MAX_PATH+40];
     assert(filename!=NULL);
-    assert(strlen(filename)+40<arraysize(string));
+    assert(strlen(filename)+40<sizeof string);
     sprintf(string,"F:%" PRIxC " %s",code_idx,filename);
     return insert_string(&dbgstrings,string);
   } /* if */
@@ -483,7 +482,7 @@ SC_FUNC stringlist *insert_dbgsymbol(symbol *sym)
       #endif
       symbol *sub;
       strcat(string," [ ");
-      for (sub=sym; sub!=NULL; sub=sub->child) {
+      for (sub=sym; sub!=NULL; sub=finddepend(sub)) {
         assert(sub->dim.array.level==count--);
         sprintf(string+strlen(string),"%x:%x ",sub->x.tags.index,sub->dim.array.length);
       } /* for */

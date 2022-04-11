@@ -28,9 +28,9 @@ main () {
 	arr5[0][0] = 0;
 
 	new a = sizeof(arr1);
-	new b = sizeof(arr1[]);
-	new c = sizeof(arr5[][]);
-	#pragma unused a, b, c
+	a = sizeof(arr1[]);
+	a = sizeof(arr5[][]);
+	#pragma unused a
 
 	f1(arr1);
 	f2(arr2);

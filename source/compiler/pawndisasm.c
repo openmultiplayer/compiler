@@ -37,17 +37,17 @@ static AMX_DBG amxdbg;
 
 typedef cell (*OPCODE_PROC)(FILE *ftxt,const cell *params,cell opcode,cell cip);
 
-static cell parm0(FILE *ftxt,const cell *params,cell opcode,cell cip);
-static cell parm1(FILE *ftxt,const cell *params,cell opcode,cell cip);
-static cell parm2(FILE *ftxt,const cell *params,cell opcode,cell cip);
-static cell parm3(FILE *ftxt,const cell *params,cell opcode,cell cip);
-static cell parm4(FILE *ftxt,const cell *params,cell opcode,cell cip);
-static cell parm5(FILE *ftxt,const cell *params,cell opcode,cell cip);
-static cell do_proc(FILE *ftxt,const cell *params,cell opcode,cell cip);
-static cell do_call(FILE *ftxt,const cell *params,cell opcode,cell cip);
-static cell do_jump(FILE *ftxt,const cell *params,cell opcode,cell cip);
-static cell do_sysreq(FILE *ftxt,const cell *params,cell opcode,cell cip);
-static cell do_casetbl(FILE *ftxt,const cell *params,cell opcode,cell cip);
+cell parm0(FILE *ftxt,const cell *params,cell opcode,cell cip);
+cell parm1(FILE *ftxt,const cell *params,cell opcode,cell cip);
+cell parm2(FILE *ftxt,const cell *params,cell opcode,cell cip);
+cell parm3(FILE *ftxt,const cell *params,cell opcode,cell cip);
+cell parm4(FILE *ftxt,const cell *params,cell opcode,cell cip);
+cell parm5(FILE *ftxt,const cell *params,cell opcode,cell cip);
+cell do_proc(FILE *ftxt,const cell *params,cell opcode,cell cip);
+cell do_call(FILE *ftxt,const cell *params,cell opcode,cell cip);
+cell do_jump(FILE *ftxt,const cell *params,cell opcode,cell cip);
+cell do_sysreq(FILE *ftxt,const cell *params,cell opcode,cell cip);
+cell do_casetbl(FILE *ftxt,const cell *params,cell opcode,cell cip);
 
 
 typedef struct {
@@ -216,12 +216,12 @@ static OPCODE opcodelist[] = {
   { /*157*/ "const.s",    parm2 },        /* version 9 */
 };
 
-static void print_opcode(FILE *ftxt,cell opcode,cell cip)
+void print_opcode(FILE *ftxt,cell opcode,cell cip)
 {
   fprintf(ftxt,"%08"PRIxC"  %s",cip,opcodelist[opcode].name);
 }
 
-static void print_funcname(FILE *ftxt,cell address)
+void print_funcname(FILE *ftxt,cell address)
 {
   int idx,numpublics;
   AMX_FUNCSTUBNT func;
@@ -232,7 +232,7 @@ static void print_funcname(FILE *ftxt,cell address)
   /* first look up the address in the debug info and, if failed, find it
    * in the public function table */
   if (dbgloaded && dbg_LookupFunction(&amxdbg,address,&dbgname)==AMX_ERR_NONE) {
-    strncpy(name,dbgname,arraysize(name));
+    strncpy(name,dbgname,sizeof name);
   } else {
     numpublics=(amxhdr.natives-amxhdr.publics)/sizeof(AMX_FUNCSTUBNT);
     fseek(fpamx,amxhdr.publics,SEEK_SET);
@@ -250,28 +250,28 @@ static void print_funcname(FILE *ftxt,cell address)
     fprintf(ftxt,"\t; %s",name);
 }
 
-static cell parm0(FILE *ftxt,const cell *params,cell opcode,cell cip)
+cell parm0(FILE *ftxt,const cell *params,cell opcode,cell cip)
 {
   print_opcode(ftxt,opcode,cip);
   fprintf(ftxt,"\n");
   return 1;
 }
 
-static cell parm1(FILE *ftxt,const cell *params,cell opcode,cell cip)
+cell parm1(FILE *ftxt,const cell *params,cell opcode,cell cip)
 {
   print_opcode(ftxt,opcode,cip);
   fprintf(ftxt," %08"PRIxC"\n",*params);
   return 2;
 }
 
-static cell parm2(FILE *ftxt,const cell *params,cell opcode,cell cip)
+cell parm2(FILE *ftxt,const cell *params,cell opcode,cell cip)
 {
   print_opcode(ftxt,opcode,cip);
   fprintf(ftxt," %08"PRIxC" %08"PRIxC"\n",params[0],params[1]);
   return 3;
 }
 
-static cell parm3(FILE *ftxt,const cell *params,cell opcode,cell cip)
+cell parm3(FILE *ftxt,const cell *params,cell opcode,cell cip)
 {
   print_opcode(ftxt,opcode,cip);
   fprintf(ftxt," %08"PRIxC" %08"PRIxC" %08"PRIxC"\n",
@@ -279,7 +279,7 @@ static cell parm3(FILE *ftxt,const cell *params,cell opcode,cell cip)
   return 4;
 }
 
-static cell parm4(FILE *ftxt,const cell *params,cell opcode,cell cip)
+cell parm4(FILE *ftxt,const cell *params,cell opcode,cell cip)
 {
   print_opcode(ftxt,opcode,cip);
   fprintf(ftxt," %08"PRIxC" %08"PRIxC" %08"PRIxC" %08"PRIxC"\n",
@@ -287,7 +287,7 @@ static cell parm4(FILE *ftxt,const cell *params,cell opcode,cell cip)
   return 5;
 }
 
-static cell parm5(FILE *ftxt,const cell *params,cell opcode,cell cip)
+cell parm5(FILE *ftxt,const cell *params,cell opcode,cell cip)
 {
   print_opcode(ftxt,opcode,cip);
   fprintf(ftxt," %08"PRIxC" %08"PRIxC" %08"PRIxC" %08"PRIxC" %08"PRIxC"\n",
@@ -295,7 +295,7 @@ static cell parm5(FILE *ftxt,const cell *params,cell opcode,cell cip)
   return 6;
 }
 
-static cell do_proc(FILE *ftxt,const cell *params,cell opcode,cell cip)
+cell do_proc(FILE *ftxt,const cell *params,cell opcode,cell cip)
 {
   print_opcode(ftxt,opcode,cip);
   print_funcname(ftxt,cip);
@@ -303,7 +303,7 @@ static cell do_proc(FILE *ftxt,const cell *params,cell opcode,cell cip)
   return 1;
 }
 
-static cell do_call(FILE *ftxt,const cell *params,cell opcode,cell cip)
+cell do_call(FILE *ftxt,const cell *params,cell opcode,cell cip)
 {
   print_opcode(ftxt,opcode,cip);
   fprintf(ftxt," %08"PRIxC,*params);
@@ -312,14 +312,14 @@ static cell do_call(FILE *ftxt,const cell *params,cell opcode,cell cip)
   return 2;
 }
 
-static cell do_jump(FILE *ftxt,const cell *params,cell opcode,cell cip)
+cell do_jump(FILE *ftxt,const cell *params,cell opcode,cell cip)
 {
   print_opcode(ftxt,opcode,cip);
   fprintf(ftxt," %08"PRIxC"\n",*params);
   return 2;
 }
 
-static cell do_sysreq(FILE *ftxt,const cell *params,cell opcode,cell cip)
+cell do_sysreq(FILE *ftxt,const cell *params,cell opcode,cell cip)
 {
   int idx,numnatives,nameoffset;
   AMX_FUNCSTUBNT func;
@@ -349,7 +349,7 @@ static cell do_sysreq(FILE *ftxt,const cell *params,cell opcode,cell cip)
   return 2;
 }
 
-static cell do_casetbl(FILE *ftxt,const cell *params,cell opcode,cell cip)
+cell do_casetbl(FILE *ftxt,const cell *params,cell opcode,cell cip)
 {
   cell num;
   int idx;
@@ -543,7 +543,7 @@ int main(int argc,char *argv[])
         nprevline=nline;
       } /* if */
     } /* if */
-    if (*(ucell *)cip>=(ucell)arraysize(opcodelist)
+    if (*(ucell *)cip>=(ucell)(sizeof opcodelist/sizeof opcodelist[0])
         || (func=opcodelist[*cip].func)==NULL) {
       printf("Invalid opcode %08"PRIxC" at address %08"PRIxC"\n",
              *cip, (cell)((unsigned char *)cip-(unsigned char *)code));

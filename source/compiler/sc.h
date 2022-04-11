@@ -46,6 +46,23 @@
 #include "../amx/osdefs.h"
 #include "../amx/amx.h"
 
+#if defined _MSC_VER
+  #define SC_FASTCALL __fastcall
+#elif defined __GNUC__ && (defined __i386__ || defined __x86_64__ || defined __amd64__)
+  #if !defined __x86_64__ && !defined __amd64__ && (__GNUC__>=4 || __GNUC__==3 && __GNUC_MINOR__>=4)
+    #define SC_FASTCALL __attribute__((fastcall))
+  #else
+    #define SC_FASTCALL __attribute__((regparam(3)))
+  #endif
+#endif
+#if !defined SC_FASTCALL
+  #define SC_FASTCALL
+#endif
+
+#if !defined strempty
+  #define strempty(str) ((str)[0]=='\0')
+#endif
+
 /* Note: the "cell" and "ucell" types are defined in AMX.H */
 
 #define PUBLIC_CHAR '@'     /* character that defines a function "public" */
@@ -97,7 +114,7 @@ typedef struct s_constvalue {
   char name[sNAMEMAX+1];
   cell value;
   int index;            /* index level, for constants referring to array sizes/tags
-                         * automaton id, for states and automatons
+                         * automaton id. for states and automatons
                          * tag for enumeration lists */
 } constvalue;
 
@@ -134,7 +151,6 @@ typedef struct s_symbol {
     struct {
       int index;        /* array & enum: tag of array indices or the enum item */
       int field;        /* enumeration fields, where a size is attached to the field */
-      int unique;       /* number of enumeration elements with unique value */
     } tags;             /* extra tags */
     constvalue *lib;    /* native function: library it is part of */
     long stacksize;     /* normal/public function: stack requirements */
@@ -147,7 +163,6 @@ typedef struct s_symbol {
       short level;      /* number of dimensions below this level */
     } array;
   } dim;                /* for 'dimension', both functions and arrays */
-  int assignlevel;      /* 'compound statement' level at which the variable was assigned a value */
   constvalue_root *states;/* list of state function/state variable ids + addresses */
   int fnumber;          /* static global variables: file number in which the declaration is visible */
   int lnumber;          /* line number (in the current source file) for the declaration */
@@ -203,6 +218,7 @@ typedef struct s_symbol {
  *  bits: 0     (uDEFINE) the symbol is defined in the source file
  *        1     (uREAD) the constant is "read" (accessed) in the source file
  *        2     (uWRITTEN) redundant, but may be set for constants passed by reference
+ *        3     (uPREDEF) the constant is pre-defined and should be kept between passes
  *        5     (uENUMROOT) the constant is the "root" of an enumeration
  *        6     (uENUMFIELD) the constant is a field in a named enumeration
  */
@@ -212,6 +228,7 @@ typedef struct s_symbol {
 #define uRETVALUE   0x004 /* function returns (or should return) a value */
 #define uCONST      0x008
 #define uPROTOTYPED 0x008
+#define uPREDEF     0x008 /* constant is pre-defined */
 #define uPUBLIC     0x010
 #define uNATIVE     0x020
 #define uENUMROOT   0x020
@@ -226,25 +243,12 @@ typedef struct s_symbol {
  * used during parsing a function, to detect a mix of "return;" and
  * "return value;" in a few special cases.
  */
-#define uRETNONE    0x010
-/* uASSIGNED indicates that a value assigned to the variable is not used yet */
-#define uASSIGNED   0x080
-/* uLOOPVAR is set when a variable is read inside of a loop condition. This is
- * used to detect situations when a variable is used in a loop condition, but
- * not modified inside of a loop body. */
-#define uLOOPVAR    0x1000
-/* uNOLOOPVAR is set when a variable is
- *   * modified inside of a loop condition before being read, or
- *   * used in an enclosing loop and should be excluded from checks in an inner loop,
- * so the compiler would know it shouldn't set the uLOOPVAR flag when the variable
- * is read inside a loop condition */
-#define uNOLOOPVAR  0x2000
+#define uRETNONE    0x10
 
 #define flagDEPRECATED 0x01  /* symbol is deprecated (avoid use) */
 #define flagNAKED     0x10  /* function is naked */
 #define flagPREDEF    0x20  /* symbol is pre-defined; successor of uPREDEF */
 
-#define uTAGOF_TAG 0x20  /* set in the "hasdefault" field of the arginfo struct */
 #define uTAGOF    0x40  /* set in the "hasdefault" field of the arginfo struct */
 #define uSIZEOF   0x80  /* set in the "hasdefault" field of the arginfo struct */
 
@@ -275,8 +279,6 @@ enum {
   wqCONT,       /* used to restore stack for "continue" */
   wqLOOP,       /* loop start label number */
   wqEXIT,       /* loop exit label number (jump if false) */
-  wqLVL,        /* "compound statement" nesting level for the loop body
-                 * (used to call destructors for "break" and "continue") */
   /* --- */
   wqSIZE        /* "while queue" size */
 };
@@ -310,57 +312,11 @@ typedef struct s_valuepair {
   long second;
 } valuepair;
 
-/* struct "symstate" is used to:
- * * synchronize the status of assignments between all "if" branches or "switch"
- *   cases, so the compiler could detect unused assignments in all of those
- *   branches/cases, not only in the last one;
- * * back up the "uNOLOOPVAR" flag when scanning for variables that were used
- *   in a loop exit condition, but weren't modified inside the loop body */
-typedef struct s_assigninfo {
-  int lnumber;      /* line number of the first unused assignment made in one of
-                     * the branches (used for error messages) */
-  short usage;      /* usage flags to memoize (currently only uASSIGNED) */
-} symstate;
-
 /* macros for code generation */
 #define opcodes(n)      ((n)*sizeof(cell))      /* opcode size */
 #define opargs(n)       ((n)*sizeof(cell))      /* size of typical argument */
 
 /* general purpose macros */
-#if defined _MSC_VER
-  #define SC_FASTCALL __fastcall
-#elif defined __GNUC__ && (defined __i386__ || defined __x86_64__ || defined __amd64__)
-  #if !defined __x86_64__ && !defined __amd64__ && (__GNUC__>=4 || __GNUC__==3 && __GNUC_MINOR__>=4)
-    #define SC_FASTCALL __attribute__((fastcall))
-  #else
-    #define SC_FASTCALL __attribute__((regparm(3)))
-  #endif
-#endif
-#if !defined SC_FASTCALL
-  #define SC_FASTCALL
-#endif
-#if !defined strempty
-  #define strempty(str) ((str)[0]=='\0')
-#endif
-#if !defined arraysize
-  #if defined __clang__
-    #if !__is_identifier(__builtin_types_compatible_p)
-      #define USE_GCC_ARRAYSIZE
-    #endif
-  #elif !defined __clang__ && defined __GNUC__
-    #if (__GNUC__==3 && __GNUC_MINOR__>=1) || __GNUC__>=4
-      #define USE_GCC_ARRAYSIZE
-    #endif
-  #endif
-  #if defined USE_GCC_ARRAYSIZE
-    #undef USE_GCC_ARRAYSIZE
-    #define arraysize(array) \
-      (sizeof(struct{int x[-__builtin_types_compatible_p(typeof(array),typeof(&(array)[0]))];}) | \
-      sizeof(array) / sizeof(array[0]))
-  #else
-    #define arraysize(array) (sizeof(array) / sizeof(array[0]))
-  #endif
-#endif
 #if !defined makelong
   #define makelong(low,high) ((long)(low) | ((long)(high) << (sizeof(long)*4)))
 #endif
@@ -420,19 +376,15 @@ enum {
   tFORWARD,
   tGOTO,
   tIF,
-  t__NAMEOF,
   tNATIVE,
   tNEW,
   tOPERATOR,
-  t__PRAGMA,
   tPUBLIC,
   tRETURN,
   tSIZEOF,
   tSLEEP,
   tSTATE,
   tSTATIC,
-  t__STATIC_ASSERT,
-  t__STATIC_CHECK,
   tSTOCK,
   tSWITCH,
   tTAGOF,
@@ -478,20 +430,9 @@ enum {
   teFUNCTN, /* Pawn function */
   teNATIVE, /* native function */
   teNONNEG, /* nonnegative integer */
-  /* for assignment to "lastst" only (see SC1.C) */
+  /* for assigment to "lastst" only (see SC1.C) */
   tEXPR,
   tENDLESS, /* endless loop */
-  tTERMINAL, /* signalizes that the code after this statement is unreachable,
-              * which can happen when:
-              *  * both 'if' branches end with different kinds of "terminal"
-              *    statements, such as 'return', 'break', 'continue' or endless
-              *    loop;
-              *  * a 'goto' is used on an already implemented label (which has
-              *    the 'uDEFINE' flag set) and there are no undefined labels
-              *    ("declared" through 'goto', but not implemented yet)
-              */
-  tTERMSWITCH, /* signalizes that all 'switch' cases (including 'default') end
-                * with terminal statements; */
 };
 
 /* (reversed) evaluation of staging buffer */
@@ -532,7 +473,7 @@ enum {
 enum {
   sOPTIMIZE_NONE,               /* no optimization */
   sOPTIMIZE_NOMACRO,            /* no macro instructions */
-  sOPTIMIZE_FULL,               /* full optimization */
+  sOPTIMIZE_DEFAULT,            /* full optimization */
   /* ----- */
   sOPTIMIZE_NUMBER
 };
@@ -558,16 +499,9 @@ typedef enum s_optmark {
   #define FIXEDTAG    0x40000000Lu
 #endif
 #define TAGMASK       (~PUBLICTAG)
-#define BOOLTAG       1
 #define CELL_MAX      (((ucell)1 << (sizeof(cell)*8-1)) - 1)
 
 #define MAX_INSTR_LEN   30
-
-typedef enum s_warnmode {
-  warnDISABLE,
-  warnENABLE,
-  warnTOGGLE
-} warnmode;
 
 #define eotNUMBER       0
 #define eotFUNCTION     1
@@ -616,16 +550,6 @@ enum {  /* search types for error_suggest() when the identifier type is "estSYMB
   esfVARCONST   = esfCONST | esfVARIABLE | esfARRAY
 };
 
-enum { /* attribute flags for "__pragma" */
-  attrDEPRECATED,
-  attrUNUSED,
-  attrUNREAD,
-  attrUNWRITTEN,
-  attrNODESTRUCT,
-  attrNAKED,
-  NUM_ATTRS
-};
-
 /* interface functions */
 #if defined __cplusplus
   extern "C" {
@@ -637,11 +561,11 @@ enum { /* attribute flags for "__pragma" */
 int pc_compile(int argc, char **argv);
 int pc_addconstant(char *name,cell value,int tag);
 int pc_addtag(char *name);
-int pc_enablewarning(int number,warnmode enable);
-void pc_pushwarnings(void);
-void pc_popwarnings(void);
+int pc_enablewarning(int number,int enable);
+int pc_pushwarnings();
+int pc_popwarnings();
 void pc_seterrorwarnings(int enable);
-int pc_geterrorwarnings(void);
+int pc_geterrorwarnings();
 
 /*
  * Functions called from the compiler (to be implemented by you)
@@ -669,7 +593,7 @@ void *pc_openasm(char *filename); /* read/write */
 void pc_closeasm(void *handle,int deletefile);
 void pc_resetasm(void *handle);
 int  pc_writeasm(void *handle,char *str);
-char *pc_readasm(void *handle,char *string,int maxchars);
+char *pc_readasm(void *handle,char *target,int maxchars);
 
 /* output to binary (.AMX) file */
 void *pc_openbin(char *filename);
@@ -714,10 +638,6 @@ SC_FUNC symbol *add_builtin_string_constant(char *name,const char *val,int vclas
 SC_FUNC void exporttag(int tag);
 SC_FUNC void sc_attachdocumentation(symbol *sym);
 SC_FUNC void emit_parse_line(void);
-SC_FUNC void pragma_deprecated(symbol *sym);
-SC_FUNC void pragma_unused(symbol *sym,int unread,int unwritten);
-SC_FUNC void pragma_nodestruct(symbol *sym);
-SC_FUNC cell do_static_check(int use_warning);
 
 /* function prototypes in SC2.C */
 #define PUSHSTK_P(v)  { stkitem s_; s_.pv=(v); pushstk(s_); }
@@ -729,14 +649,11 @@ SC_FUNC stkitem popstk(void);
 SC_FUNC void clearstk(void);
 SC_FUNC int plungequalifiedfile(char *name);  /* explicit path included */
 SC_FUNC int plungefile(char *name,int try_currentpath,int try_includepaths);   /* search through "include" paths */
-SC_FUNC int number(cell *val,const unsigned char *curptr);
 SC_FUNC void preprocess(void);
 SC_FUNC void lexinit(void);
 SC_FUNC int lex(cell *lexvalue,char **lexsym);
 SC_FUNC void lexpush(void);
 SC_FUNC void lexclr(int clreol);
-SC_FUNC void recstart(void);
-SC_FUNC void recstop(void);
 SC_FUNC int matchtoken(int token);
 SC_FUNC int tokeninfo(cell *val,char **str);
 SC_FUNC int needtoken(int token);
@@ -745,17 +662,14 @@ SC_FUNC void litinsert(cell value,int pos);
 SC_FUNC int alphanum(char c);
 SC_FUNC int ishex(char c);
 SC_FUNC void delete_symbol(symbol *root,symbol *sym);
-SC_FUNC void delete_symbols(symbol *root,int level,int delete_labels,int delete_functions);
+SC_FUNC void delete_symbols(symbol *root,int level,int del_labels,int delete_functions);
 SC_FUNC int refer_symbol(symbol *entry,symbol *bywhom);
 SC_FUNC void markusage(symbol *sym,int usage);
-SC_FUNC void markinitialized(symbol *sym,int assignment);
-SC_FUNC void clearassignments(int fromlevel);
-SC_FUNC void memoizeassignments(int fromlevel,symstate **assignments);
-SC_FUNC void restoreassignments(int fromlevel,symstate *assignments);
 SC_FUNC void rename_symbol(symbol *sym,const char *newname);
 SC_FUNC symbol *findglb(const char *name,int filter);
 SC_FUNC symbol *findloc(const char *name);
-SC_FUNC symbol *findconst(const char *name,int *cmptag);
+SC_FUNC symbol *findconst(const char *name,int *matchtag);
+SC_FUNC symbol *finddepend(const symbol *parent);
 SC_FUNC symbol *addsym(const char *name,cell addr,int ident,int vclass,int tag,
                        int usage);
 SC_FUNC symbol *addvariable(const char *name,cell addr,int ident,int vclass,int tag,
@@ -782,14 +696,14 @@ SC_FUNC void setfiledirect(char *name);
 SC_FUNC void setfileconst(char *name);
 SC_FUNC void setlinedirect(int line);
 SC_FUNC void setlineconst(int line);
-SC_FUNC void setlabel(int number);
+SC_FUNC void setlabel(int index);
 SC_FUNC void markexpr(optmark type,const char *name,cell offset);
 SC_FUNC void startfunc(char *fname,int generateproc);
 SC_FUNC void endfunc(void);
 SC_FUNC void alignframe(int numbytes);
 SC_FUNC void rvalue(value *lval);
 SC_FUNC void dereference(void);
-SC_FUNC void address(symbol *sym,regid reg);
+SC_FUNC void address(symbol *ptr,regid reg);
 SC_FUNC void store(value *lval);
 SC_FUNC void loadreg(cell address,regid reg);
 SC_FUNC void storereg(cell address,regid reg);
@@ -866,9 +780,7 @@ SC_FUNC void outinstr(const char *name,emit_outval params[],int numparams);
 /* function prototypes in SC5.C */
 SC_FUNC int error(long number,...);
 SC_FUNC void errorset(int code,int line);
-SC_FUNC void warnstack_init(void);
-SC_FUNC void warnstack_cleanup(void);
-SC_FUNC int error_suggest(int number,const char *name,const char *name2,int type,int subtype);
+SC_FUNC int error_suggest(int error,const char *name,const char *name2,int type,int subtype);
 
 /* function prototypes in SC6.C */
 SC_FUNC int assemble(FILE *fout,FILE *fin);
@@ -876,21 +788,25 @@ SC_FUNC int assemble(FILE *fout,FILE *fin);
 /* function prototypes in SC7.C */
 SC_FUNC void stgbuffer_cleanup(void);
 SC_FUNC void stgmark(char mark);
-SC_FUNC void stgwrite(const char *str);
+SC_FUNC void stgwrite(const char *st);
 SC_FUNC void stgout(int index);
 SC_FUNC void stgdel(int index,cell code_index);
 SC_FUNC int stgget(int *index,cell *code_index);
 SC_FUNC void stgset(int onoff);
+SC_FUNC int phopt_init(void);
+SC_FUNC int phopt_cleanup(void);
 
 /* function prototypes in SCLIST.C */
 SC_FUNC char* duplicatestring(const char* sourcestring);
 SC_FUNC stringpair *insert_alias(char *name,char *alias);
+SC_FUNC stringpair *find_alias(char *name);
 SC_FUNC int lookup_alias(char *target,char *name);
 SC_FUNC void delete_aliastable(void);
 SC_FUNC stringlist *insert_path(char *path);
 SC_FUNC char *get_path(int index);
 SC_FUNC void delete_pathtable(void);
 SC_FUNC stringpair *insert_subst(char *pattern,char *substitution,int prefixlen);
+SC_FUNC int get_subst(int index,char **pattern,char **substitution);
 SC_FUNC stringpair *find_subst(char *name,int length);
 SC_FUNC int delete_subst(char *name,int length);
 SC_FUNC void delete_substtable(void);
@@ -975,7 +891,6 @@ SC_VDECL char sc_ctrlchar;    /* the control character (or escape character) */
 SC_VDECL char sc_ctrlchar_org;/* the default control character */
 SC_VDECL int litidx;          /* index to literal table */
 SC_VDECL int litmax;          /* current size of the literal table */
-SC_VDECL int litgrow;         /* amount to increase the literal table by */
 SC_VDECL int stgidx;          /* index to the staging buffer */
 SC_VDECL int sc_labnum;       /* number of (internal) labels */
 SC_VDECL int staging;         /* true if staging output */
@@ -1004,7 +919,6 @@ SC_VDECL short fnumber;       /* number of files in the file table (debugging) *
 SC_VDECL short fcurrent;      /* current file being processed (debugging) */
 SC_VDECL short sc_intest;     /* true if inside a test */
 SC_VDECL int pc_sideeffect;   /* true if an expression causes a side-effect */
-SC_VDECL int pc_ovlassignment;/* true if an expression contains an overloaded assignment */
 SC_VDECL int stmtindent;      /* current indent of the statement */
 SC_VDECL int indent_nowarn;   /* skip warning "217 loose indentation" */
 SC_VDECL int sc_tabsize;      /* number of spaces that a TAB represents */
@@ -1021,17 +935,6 @@ SC_VDECL int pc_memflags;     /* special flags for the stack/heap usage */
 SC_VDECL int pc_naked;        /* if true mark following function as naked */
 SC_VDECL int pc_compat;       /* running in compatibility mode? */
 SC_VDECL int pc_recursion;    /* enable detailed recursion report? */
-SC_VDECL int pc_retexpr;      /* true if the current expression is a part of a "return" statement */
-SC_VDECL int pc_retheap;      /* heap space (in bytes) to be manually freed when returning an array returned by another function */
-SC_VDECL int pc_nestlevel;    /* number of active (open) compound statements */
-SC_VDECL unsigned int pc_attributes;/* currently set attribute flags (for the "__pragma" operator) */
-SC_VDECL int pc_ispackedstr;  /* true if the last tokenized string is packed */
-SC_VDECL int pc_isrecording;  /* true if recording input */
-SC_VDECL char *pc_recstr;     /* recorded input */
-SC_VDECL int pc_loopcond;     /* equals to 'tFOR', 'tWHILE' or 'tDO' if the current expression is a loop condition, zero otherwise */
-SC_VDECL int pc_numloopvars;  /* number of variables used inside a loop condition */
-
-SC_VDECL char *sc_tokens[];
 
 SC_VDECL constvalue_root sc_automaton_tab; /* automaton table */
 SC_VDECL constvalue_root sc_state_tab;     /* state table */

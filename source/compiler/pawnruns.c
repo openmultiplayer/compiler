@@ -27,7 +27,6 @@ static void PrintUsage(char *program)
 int main(int argc,char *argv[])
 {
   extern AMX_NATIVE_INFO console_Natives[];
-  extern AMX_NATIVE_INFO string_Natives[];
   extern AMX_NATIVE_INFO core_Natives[];
 
   AMX amx;
@@ -42,7 +41,6 @@ int main(int argc,char *argv[])
     ErrorExit(&amx, err);
 
   amx_Register(&amx, console_Natives, -1);
-  amx_Register(&amx, string_Natives, -1);
   err = amx_Register(&amx, core_Natives, -1);
   if (err != AMX_ERR_NONE)
     ErrorExit(&amx, err);

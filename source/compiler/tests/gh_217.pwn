@@ -27,18 +27,8 @@ this \
 please
 f() {}
 
-#pragma deprecated don't\
-    use \
-this \
-    function\
-please
-forward p();
-
-public p() {}
-
 main() {
     d1;
     d2;
     f();
-    p();
 }

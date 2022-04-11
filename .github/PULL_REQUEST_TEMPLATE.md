@@ -12,11 +12,7 @@ Never pull to `master` - always pull to `dev` or a relevant feature branch.
 
 **Which issue(s) this PR fixes**:
 
-<!--
-Please ensure you have discussed your proposed changes before committing time to writing code!
-
-GitHub tip: using "Fixes #<issue number> will automatically close the issue upon being merged
--->
+<!--GitHub tip: using "Fixes #<issue number> will automatically close the issue upon being merged-->
 
 Fixes #
 
