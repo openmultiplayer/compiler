@@ -781,8 +781,11 @@ static int amx_BrowseRelocate(AMX *amx)
     } /* switch */
   } /* for */
 
-  assert(sysreq_flg==0 || sysreq_flg==0x01 || sysreq_flg==0x02);
-
+  #if defined AMX_NO_MACRO_INSTR
+    assert(sysreq_flg==0 || sysreq_flg==0x01);
+  #else
+    assert(sysreq_flg==0 || sysreq_flg==0x01 || sysreq_flg==0x02 || sysreq_flg==0x03);
+  #endif
   #if defined JIT
     amx->code_size = getMaxCodeSize()*opcode_count + hdr->cod
                      + (hdr->stp - hdr->dat);
