@@ -1335,31 +1335,27 @@ int AMXAPI amx_GetNative(AMX *amx, int index, char *funcname)
   return AMX_ERR_NONE;
 }
 
-int AMXAPI amx_FindNative(AMX *amx, const char *name, int *index)
+int AMXAPI amx_FindNative(AMX* amx, const char* name, int* index)
 {
-  int first,last,mid,result;
-  char pname[sNAMEMAX+1];
+    AMX_HEADER* hdr = (AMX_HEADER*)amx->base;
 
-  amx_NumNatives(amx, &last);
-  last--;       /* last valid index is 1 less than the number of functions */
-  first=0;
-  /* binary search */
-  while (first<=last) {
-    mid=(first+last)/2;
-    amx_GetNative(amx, mid, pname);
-    result=strcmp(pname,name);
-    if (result>0) {
-      last=mid-1;
-    } else if (result<0) {
-      first=mid+1;
-    } else {
-      *index=mid;
-      return AMX_ERR_NONE;
-    } /* if */
-  } /* while */
-  /* not found, set to an invalid index, so amx_Exec() will fail */
-  *index=INT_MAX;
-  return AMX_ERR_NOTFOUND;
+    int entries = NUMENTRIES(hdr, natives, libraries);
+
+    if (entries) {
+        int idx = 0;
+        AMX_FUNCPART* func;
+        for (idx = 0; idx != entries; ++idx) {
+            func = GETENTRY(hdr, natives, idx);
+            if (!strcmp(name, GETENTRYNAME(hdr, func))) {
+                *index = idx;
+                return AMX_ERR_NONE;
+            }
+        }
+    }
+
+    /* not found, set to an invalid index, so amx_Exec() will fail */
+    *index = INT_MAX;
+    return AMX_ERR_NOTFOUND;
 }
 #endif /* AMX_XXXNATIVES */
 

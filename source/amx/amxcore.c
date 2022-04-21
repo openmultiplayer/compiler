@@ -333,7 +333,7 @@ static char *MakePackedString(cell *cptr)
   return dest;
 }
 
-/* getproperty(id=0, const name[]="", value=cellmin, string[]="", size=sizeof string) */
+/* getproperty(id=0, const name[]="", value=cellmin, string[]="") */
 static cell AMX_NATIVE_CALL getproperty(AMX *amx,const cell *params)
 {
   cell *cstr;
@@ -347,7 +347,7 @@ static cell AMX_NATIVE_CALL getproperty(AMX *amx,const cell *params)
   /* if list_finditem() found the value, store the name */
   if (item!=NULL && item->value==params[3] && strlen(name)==0) {
     cstr=amx_Address(amx,params[4]);
-    amx_SetString(cstr,item->name,1,0,params[5]);
+    amx_SetString(cstr,item->name,1,0, UNLIMITED);
   } /* if */
   free(name);
   return (item!=NULL) ? item->value : 0;
