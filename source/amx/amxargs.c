@@ -95,12 +95,10 @@ static const TCHAR *rawcmdline(void)
     static char cmdbuffer[1024];  /* some arbitrary maximum */
   #endif
   const TCHAR *ptr;
-  int skip = 0;
 
   if (cmdline == NULL) {
     #if defined __WIN32__ || defined _WIN32 || defined WIN32
       cmdline = GetCommandLine();
-      skip++;
     #elif defined _Windows || defined __MSDOS__
       #if defined _Windows
         unsigned short _psp = GetCurrentPDB();
@@ -135,7 +133,6 @@ static const TCHAR *rawcmdline(void)
         for (ptr = cmdbuffer; *ptr != ' '; ptr = strchr(ptr, '\0') + 1)
           *ptr = ' ';
         cmdline = cmdbuffer;
-        skip++;
       } /* if */
     #else
       /* no mechanism for determining the commandline, so it
@@ -144,21 +141,25 @@ static const TCHAR *rawcmdline(void)
       ptr = "";
     #endif
 
+    /* find `--` separating script args */
+    while (cmdline != NULL) {
+      ptr = _tcschr(cmdline, '-');
+      if (ptr == NULL) {
+        cmdline = _tcschr(cmdline, __T('\0'));
+        return cmdline;
+      } else if (*(ptr + 1) == __T('-')) {
+        cmdline = ptr + 2;
+        if (*(ptr + 2) == __T(' ') || *(ptr + 2) == __T('\0')) {
+          break;
+        }
+      } else {
+        cmdline = ptr + 1;
+      }
+    }
+
     /* skip leading white space */
     while (*cmdline <= __T(' ') && *cmdline != __T('\0'))
       cmdline++;
-
-    #if AMXARGS_SKIPARG
-      skip++;
-    #endif
-    /* skip the first option(s), because it is the name of the host program
-     * and the name of the script
-     */
-    if ((ptr = tokenize(cmdline, skip, NULL)) != NULL)
-      cmdline = ptr;
-    else
-      cmdline = _tcschr(cmdline, __T('\0'));
-
   } /* if */
 
   return cmdline;
