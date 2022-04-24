@@ -191,7 +191,7 @@ static const TCHAR *tokenize(const TCHAR *string, int index, int *length)
         endchar = *start++;
       else
         endchar = __T(' ');
-      } /* if */
+    } /* if */
     index--;
   } /* while */
   if (start != NULL && length != NULL) {
@@ -201,7 +201,10 @@ static const TCHAR *tokenize(const TCHAR *string, int index, int *length)
     assert(end != NULL);
     *length = (int)(end - start);
   } /* if */
-  return start;
+  if (*start == __T('\0'))
+    return NULL;
+  else
+    return start;
 }
 
 static const TCHAR *matcharg(const TCHAR *key, int skip, int *length)
