@@ -201,7 +201,7 @@ static const TCHAR *tokenize(const TCHAR *string, int index, int *length)
     assert(end != NULL);
     *length = (int)(end - start);
   } /* if */
-  if (*start == __T('\0'))
+  if (start == NULL || *start == __T('\0'))
     return NULL;
   else
     return start;
