@@ -822,7 +822,7 @@ static cell AMX_NATIVE_CALL n_flength(AMX *amx, const cell *params)
   int fn=fileno((FILE*)params[1]);
   c=lseek(fn,0,SEEK_CUR); /* save the current position */
   l=lseek(fn,0,SEEK_END); /* return the file position at its end */
-  lseek(fn,c,SEEK_SET);   /* restore the file pointer */
+  fseek((FILE *)params[1],c,SEEK_SET);   /* restore the file pointer */
   (void)amx;
   return l;
 }
