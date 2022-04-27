@@ -738,6 +738,15 @@ static cell AMX_NATIVE_CALL n_fseek(AMX *amx, const cell *params)
   return lseek(fileno((FILE*)params[1]),params[2],whence);
 }
 
+/* ftell(File: handle) */
+static cell AMX_NATIVE_CALL n_ftell(AMX *amx, const cell *params)
+{
+  if (!params[1]) {
+      return 0;
+  }
+  return (cell)ftell((FILE *)params[1]);
+}
+
 /* bool: fremove(const name[]) */
 static cell AMX_NATIVE_CALL n_fremove(AMX *amx, const cell *params)
 {
@@ -1248,6 +1257,7 @@ AMX_NATIVE_INFO file_Natives[] = {
   { "writecfg",     n_writecfg },
   { "writecfgvalue",n_writecfgvalue },
   { "deletecfg",    n_deletecfg },
+  { "ftell",        n_ftell },
   { NULL, NULL }        /* terminator */
 };
 
