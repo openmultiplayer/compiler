@@ -707,7 +707,7 @@ static cell AMX_NATIVE_CALL n_ispacked(AMX *amx,const cell *params)
 {
   cell *cstr=amx_Address(amx,params[1]);
   (void)(amx);
-  return *cstr>=UNPACKEDMAX;
+  return (ucell)*cstr>UNPACKEDMAX;
 }
 
 

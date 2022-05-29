@@ -203,7 +203,7 @@ extern  "C" {
   #error Unsupported cell size (PAWN_CELL_SIZE)
 #endif
 
-#define UNPACKEDMAX   (((cell)1 << (sizeof(cell)-1)*8) - 1)
+#define UNPACKEDMAX   (((ucell)1 << (sizeof(ucell)-1)*8) - 1)
 #define UNLIMITED     (~1u >> 1)
 
 struct tagAMX;
