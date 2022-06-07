@@ -1,4 +1,4 @@
-/*  Pawn compiler - Recursive descend expresion parser
+/*  Pawn compiler - Recursive descend expression parser
  *
  *  Copyright (c) ITB CompuPhase, 1997-2005
  *
@@ -61,9 +61,13 @@ static int dbltest(void (*oper)(),value *lval1,value *lval2);
 static int commutative(void (*oper)());
 static int constant(value *lval);
 
+static const char str_w247unary[]="a \"bool:\" value";
+static const char str_w247binary[]="\"bool:\" values";
 static char lastsymbol[sNAMEMAX+1]; /* name of last function/variable */
 static int bitwise_opercount;   /* count of bitwise operators in an expression */
 static int decl_heap=0;
+static int lval_stgidx=0;
+static cell lval_cidx=0;
 
 /* Function addresses of binary operators for signed operations */
 static void (*op1[17])(void) = {
@@ -76,15 +80,15 @@ static void (*op1[17])(void) = {
   os_le,os_ge,os_lt,os_gt,      /* hier9, index 11 */
   ob_eq,ob_ne,                  /* hier10, index 15 */
 };
-/* These two functions are defined because the functions inc() and dec() in
- * SC4.C have a different prototype than the other code generation functions.
+/* These two macros are defined because the functions inc() and dec() in SC4.C
+ * have a different prototype than the other code generation functions.
  * The arrays for user-defined functions use the function pointers for
  * identifying what kind of operation is requested; these functions must all
  * have the same prototype. As inc() and dec() are special cases already, it
- * is simplest to add two "do-nothing" functions.
+ * is simplest to cast them into "void (*)(void)".
  */
-static void user_inc(void) {}
-static void user_dec(void) {}
+#define user_inc ((void (*)(void))inc)
+#define user_dec ((void (*)(void))dec)
 
 /*
  *  Searches for a binary operator a list of operators. The list is stored in
@@ -94,7 +98,7 @@ static void user_dec(void) {}
  *  no operator is found, nextop() returns 0.
  *
  *  If an operator is found in the expression, it cannot be used in a function
- *  call with omitted parantheses. Mark this...
+ *  call with omitted parentheses. Mark this...
  *
  *  Global references: sc_allowproccall   (modified)
  */
@@ -144,8 +148,8 @@ static void (*unopers[])(void) = { lneg, neg, user_inc, user_dec };
       if (lval!=NULL && (lval->ident==iARRAYCELL || lval->ident==iARRAYCHAR))
         savealt=TRUE;
     } else {
-      assert( (sizeof binoperstr / sizeof binoperstr[0]) == (sizeof op1 / sizeof op1[0]) );
-      for (i=0; i<sizeof op1 / sizeof op1[0]; i++) {
+      assert_static( arraysize(binoperstr) == arraysize(op1) );
+      for (i=0; i<arraysize(op1); i++) {
         if (oper==op1[i]) {
           strcpy(opername,binoperstr[i]);
           savepri=binoper_savepri[i];
@@ -157,9 +161,9 @@ static void (*unopers[])(void) = { lneg, neg, user_inc, user_dec };
     assert(oper!=NULL);
     assert(numparam==1);
     /* try a select group of unary operators */
-    assert( (sizeof unoperstr / sizeof unoperstr[0]) == (sizeof unopers / sizeof unopers[0]) );
+    assert_static( arraysize(unoperstr) == arraysize(unopers) );
     if (opername[0]=='\0') {
-      for (i=0; i<sizeof unopers / sizeof unopers[0]; i++) {
+      for (i=0; i<arraysize(unopers); i++) {
         if (oper==unopers[i]) {
           strcpy(opername,unoperstr[i]);
           break;
@@ -190,13 +194,16 @@ static void (*unopers[])(void) = { lneg, neg, user_inc, user_dec };
     if (sym==NULL /*|| (sym->usage & uDEFINE)==0*/)
       return FALSE;
   } /* if */
+  if (oper==NULL)
+    pc_ovlassignment=TRUE;
 
-  /* check existance and the proper declaration of this function */
+  /* check existence and the proper declaration of this function */
   if ((sym->usage & uMISSING)!=0 || (sym->usage & uPROTOTYPED)==0) {
     char symname[2*sNAMEMAX+16];  /* allow space for user defined operators */
+    char *ptr= (sym->documentation!=NULL) ? sym->documentation : "";
     funcdisplayname(symname,sym->name);
     if ((sym->usage & uMISSING)!=0)
-      error(4,symname);           /* function not defined */
+      error(4,symname,ptr);       /* function not defined */
     if ((sym->usage & uPROTOTYPED)==0)
       error(71,symname);          /* operator must be declared before use */
   } /* if */
@@ -230,8 +237,7 @@ static void (*unopers[])(void) = { lneg, neg, user_inc, user_dec };
     pushreg(sPRI);              /* right-hand operand is in PRI */
   } else if (savealt) {
     /* for the assignment operator, ALT may contain an address at which the
-     * result must be stored; this address must be preserved accross the
-     * call
+     * result must be stored; this address must be preserved across the call
      */
     assert(lval!=NULL);         /* this was checked earlier */
     assert(lval->ident==iARRAYCELL || lval->ident==iARRAYCHAR); /* checked earlier */
@@ -357,10 +363,12 @@ static int skim(int *opstr,void (*testfunc)(int),int dropval,int endval,
   int lvalue,hits,droplab,endlab,opidx;
   int allconst,foundop;
   cell constval;
-  int index;
-  cell cidx;
+  int org_index;
+  cell org_cidx;
 
-  stgget(&index,&cidx);         /* mark position in code generator */
+  org_index=lval_stgidx;
+  org_cidx=lval_cidx;
+  stgget(&lval_stgidx,&lval_cidx);/* mark position in code generator */
   hits=FALSE;                   /* no logical operators "hit" yet */
   allconst=TRUE;                /* assume all values "const" */
   constval=0;
@@ -398,21 +406,26 @@ static int skim(int *opstr,void (*testfunc)(int),int dropval,int endval,
       ldconst(dropval,sPRI);
       setlabel(endlab);
       lval->sym=NULL;
-      lval->tag=pc_addtag("bool");  /* force tag to be "bool" */
+      lval->tag=BOOLTAG;            /* force tag to be "bool" */
       if (allconst) {
         lval->ident=iCONSTEXPR;
         lval->constval=constval;
-        stgdel(index,cidx);         /* scratch generated code and calculate */
+        stgdel(lval_stgidx,lval_cidx);/* scratch generated code and calculate */
       } else {
         lval->ident=iEXPRESSION;
         lval->constval=0;
       } /* if */
-      return FALSE;
+      lvalue=FALSE;
+      break;
     } else {
-      return lvalue;            /* none of the operators in "opstr" were found */
+      break;                    /* none of the operators in "opstr" were found */
     } /* if */
 
-  } /* while */
+  } /* for */
+
+  lval_stgidx=org_index;
+  lval_cidx=org_cidx;
+  return lvalue;
 }
 
 /*
@@ -522,7 +535,7 @@ static int plnge_rel(int *opstr,int opoff,int (*hier)(value *lval),value *lval)
       relop_suffix();
   } while (nextop(&opidx,opstr)); /* enddo */
   lval->constval=lval->boolresult;
-  lval->tag=pc_addtag("bool");    /* force tag to be "bool" */
+  lval->tag=BOOLTAG;    /* force tag to be "bool" */
   return FALSE;         /* result of expression is not an lvalue */
 }
 
@@ -533,13 +546,17 @@ static int plnge_rel(int *opstr,int opoff,int (*hier)(value *lval),value *lval)
  */
 static int plnge1(int (*hier)(value *lval),value *lval)
 {
-  int lvalue,index;
-  cell cidx;
+  int lvalue,org_index;
+  cell org_cidx;
 
-  stgget(&index,&cidx); /* mark position in code generator */
+  org_index=lval_stgidx;
+  org_cidx=lval_cidx;
+  stgget(&lval_stgidx,&lval_cidx);  /* mark position in code generator */
   lvalue=(*hier)(lval);
   if (lval->ident==iCONSTEXPR)
-    stgdel(index,cidx); /* load constant later */
+    stgdel(lval_stgidx,lval_cidx);  /* load constant later */
+  lval_stgidx=org_index;
+  lval_cidx=org_cidx;
   return lvalue;
 }
 
@@ -552,10 +569,12 @@ static void plnge2(void (*oper)(void),
                    int (*hier)(value *lval),
                    value *lval1,value *lval2)
 {
-  int index;
-  cell cidx;
+  int org_index;
+  cell org_cidx;
 
-  stgget(&index,&cidx);             /* mark position in code generator */
+  org_index=lval_stgidx;
+  org_cidx=lval_cidx;
+  stgget(&lval_stgidx,&lval_cidx);  /* mark position in code generator */
   if (lval1->ident==iCONSTEXPR) {   /* constant on left side; it is not yet loaded */
     if (plnge1(hier,lval2))
       rvalue(lval2);                /* load lvalue now */
@@ -570,9 +589,9 @@ static void plnge2(void (*oper)(void),
       rvalue(lval2);
     if (lval2->ident==iCONSTEXPR) { /* constant on right side */
       if (commutative(oper)) {      /* test for commutative operators */
-        value lvaltmp = {0};
-        stgdel(index,cidx);         /* scratch pushreg() and constant fetch (then
-                                     * fetch the constant again */
+        value lvaltmp;
+        stgdel(lval_stgidx,lval_cidx);  /* scratch pushreg() and constant fetch (then
+                                         * fetch the constant again */
         ldconst(lval2->constval<<dbltest(oper,lval1,lval2),sALT);
         /* now, the primary register has the left operand and the secondary
          * register the right operand; swap the "lval" variables so that lval1
@@ -618,33 +637,62 @@ static void plnge2(void (*oper)(void),
     } /* if */
     /* ??? ^^^ should do same kind of error checking with functions */
 
+    /* If we're handling a division operation, make sure the divisor is not zero. */
+    if ((oper==os_div || oper==os_mod) && lval2->ident==iCONSTEXPR && lval2->constval==0)
+      error(94); /* division by zero */
+
     /* check whether an "operator" function is defined for the tag names
      * (a constant expression cannot be optimized in that case)
      */
     if (check_userop(oper,lval1->tag,lval2->tag,2,NULL,&lval1->tag)) {
       lval1->ident=iEXPRESSION;
       lval1->constval=0;
-    } else if (lval1->ident==iCONSTEXPR && lval2->ident==iCONSTEXPR) {
-      /* only constant expression if both constant */
-      stgdel(index,cidx);       /* scratch generated code and calculate */
-      check_tagmismatch(lval1->tag,lval2->tag,FALSE,-1);
-      lval1->constval=calc(lval1->constval,oper,lval2->constval,&lval1->boolresult);
     } else {
-      check_tagmismatch(lval1->tag,lval2->tag,FALSE,-1);
-      (*oper)();                /* do the (signed) operation */
-      lval1->ident=iEXPRESSION;
+      if (lval1->tag==BOOLTAG && lval2->tag==BOOLTAG
+          && oper!=ob_or && oper!=ob_xor && oper!=ob_and && oper!=ob_eq && oper!=ob_ne) {
+        static void (*const opers[])(void) = {
+          os_mult,os_div,os_mod,ob_add,ob_sub,ob_sal,
+          os_sar,ou_sar,os_le,os_ge,os_lt,os_gt
+        };
+        static const char *opnames[] = {
+          "*","/","%","+","-","<<",
+          ">>",">>>","<=",">=","<",">"
+        };
+        int i;
+        assert_static(arraysize(opers)==arraysize(opnames));  /* make sure the array sizes match */
+        assert_static(arraysize(op1)==17);  /* in case a new operator is added into the compiler,
+                                             * arrays "opers" and "opnames" might need to be updated */
+        for (i=0; i<arraysize(opers); i++)
+          if (oper==opers[i])
+            break;
+        assert(i<arraysize(opers));
+        error(247,opnames[i],str_w247binary);   /* use of operator on \"bool:\" values */
+      } else if ((oper==ob_sal || oper==os_sar || oper==ou_sar)
+          && (lval2->ident==iCONSTEXPR && (lval2->constval<0 || lval2->constval>=PAWN_CELL_SIZE))) {
+        error(241);             /* negative or too big shift count */
+      } /* if */
+      if (lval1->ident==iCONSTEXPR && lval2->ident==iCONSTEXPR) {
+        /* only constant expression if both constant */
+        stgdel(lval_stgidx,lval_cidx);  /* scratch generated code and calculate */
+        check_tagmismatch(lval1->tag,lval2->tag,FALSE,-1);
+        lval1->constval=calc(lval1->constval,oper,lval2->constval,&lval1->boolresult);
+      } else {
+        check_tagmismatch(lval1->tag,lval2->tag,FALSE,-1);
+        (*oper)();                /* do the (signed) operation */
+        lval1->ident=iEXPRESSION;
+      } /* if */
     } /* if */
   } /* if */
+  lval_stgidx=org_index;
+  lval_cidx=org_cidx;
 }
 
 static cell flooreddiv(cell a,cell b,int return_remainder)
 {
   cell q,r;
 
-  if (b==0) {
-    error(29);
+  if (b==0)
     return 0;
-  } /* if */
   /* first implement truncated division in a portable way */
   #define IABS(a)       ((a)>=0 ? (a) : (-a))
   q=IABS(a)/IABS(b);
@@ -692,9 +740,9 @@ static cell calc(cell left,void (*oper)(),cell right,char *boolresult)
   else if (oper==os_mult)
     return (left * right);
   else if (oper==os_div)
-    return flooreddiv(left,right,0);
+    return flooreddiv(left,right,FALSE);
   else if (oper==os_mod)
-    return flooreddiv(left,right,1);
+    return flooreddiv(left,right,TRUE);
   else
     error(29);  /* invalid expression, assumed 0 (this should never occur) */
   return 0;
@@ -709,7 +757,14 @@ SC_FUNC int expression(cell *val,int *tag,symbol **symptr,int chkfuncresult)
     rvalue(&lval);
   /* scrap any arrays left on the heap */
   assert(decl_heap>=locheap);
-  modheap((locheap-decl_heap)*sizeof(cell));  /* remove heap space, so negative delta */
+  if (!pc_retexpr) {
+    modheap((locheap-decl_heap)*sizeof(cell));/* remove heap space, so negative delta */
+  } else {
+    /* we need to copy the data from the leftover space first (e.g. when used
+     * from 'return' when returning a string returned by another function),
+     * so we'll free it manually later */
+    pc_retheap=(locheap-decl_heap)*sizeof(cell);
+  } /* if */
   decl_heap=locheap;
 
   if (lval.ident==iCONSTEXPR && val!=NULL)    /* constant expression */
@@ -736,7 +791,7 @@ SC_FUNC int sc_getstateid(constvalue **automaton,constvalue **state)
     return 0;
 
   tokeninfo(&val,&str);
-  assert(strlen(str)<sizeof name);
+  assert(strlen(str)<arraysize(name));
   strcpy(name,str);
   if (islabel || matchtoken(':')) {
     /* token is an automaton name, add the name and get a new token */
@@ -753,7 +808,7 @@ SC_FUNC int sc_getstateid(constvalue **automaton,constvalue **state)
       return 0;
     } /* if */
     assert((*automaton)->index>0);
-    assert(strlen(str)<sizeof name);
+    assert(strlen(str)<arraysize(name));
     strcpy(name,str);
   } else {
     *automaton=automaton_find("");
@@ -784,7 +839,7 @@ SC_FUNC cell array_totalsize(symbol *sym)
   assert(sym->ident==iARRAY || sym->ident==iREFARRAY);
   length=sym->dim.array.length;
   if (sym->dim.array.level > 0) {
-    cell sublength=array_totalsize(finddepend(sym));
+    cell sublength=array_totalsize(sym->child);
     if (sublength>0)
       length=length+length*sublength;
     else
@@ -799,9 +854,9 @@ static cell array_levelsize(symbol *sym,int level)
   assert(sym->ident==iARRAY || sym->ident==iREFARRAY);
   assert(level <= sym->dim.array.level);
   while (level-- > 0) {
-    sym=finddepend(sym);
+    sym=sym->child;
     assert(sym!=NULL);
-  } /* if */
+  } /* while */
   return sym->dim.array.length;
 }
 
@@ -809,7 +864,7 @@ static cell array_levelsize(symbol *sym,int level)
  *
  *  Lowest hierarchy level (except for the , operator).
  *
- *  Global references: sc_intest        (reffered to only)
+ *  Global references: sc_intest        (referred to only)
  *                     sc_allowproccall (modified)
  */
 static int hier14(value *lval1)
@@ -896,7 +951,7 @@ static int hier14(value *lval1)
   } else if (lval1->ident==iARRAY || lval1->ident==iREFARRAY) {
     /* array assignment is permitted too (with restrictions) */
     if (oper)
-      return error(23); /* array assignment must be simple assigment */
+      return error(23); /* array assignment must be simple assignment */
     assert(lval1->sym!=NULL);
     if (array_totalsize(lval1->sym)==0)
       return error(46,lval1->sym->name);        /* unknown array size */
@@ -912,7 +967,7 @@ static int hier14(value *lval1)
     return error(22);           /* assignment to const argument */
   sc_allowproccall=FALSE;       /* may no longer use "procedure call" syntax */
 
-  lval3=*lval1;         /* save symbol to enable storage of expresion result */
+  lval3=*lval1;         /* save symbol to enable storage of expression result */
   lval1->arrayidx=org_arrayidx; /* restore array index pointer */
   if (lval1->ident==iARRAYCELL || lval1->ident==iARRAYCHAR
       || lval1->ident==iARRAY || lval1->ident==iREFARRAY)
@@ -1022,7 +1077,6 @@ static int hier14(value *lval1)
       /* check the sizes of all sublevels too */
       symbol *sym1 = lval3.sym;
       symbol *sym2 = lval2.sym;
-      int i;
       assert(sym1!=NULL && sym2!=NULL);
       /* ^^^ sym2 must be valid, because only variables can be
        *     multi-dimensional (there are no multi-dimensional literals),
@@ -1030,11 +1084,11 @@ static int hier14(value *lval1)
        */
       assert(exactmatch);
       for (i=0; i<level; i++) {
-        sym1=finddepend(sym1);
-        sym2=finddepend(sym2);
+        sym1=sym1->child;
+        sym2=sym2->child;
         assert(sym1!=NULL && sym2!=NULL);
         /* ^^^ both arrays have the same dimensions (this was checked
-         *     earlier) so the dependend should always be found
+         *     earlier) so the dependent should always be found
          */
         if (sym1->dim.array.length!=sym2->dim.array.length)
           error(47);    /* array sizes must match */
@@ -1053,7 +1107,8 @@ static int hier14(value *lval1)
   if (leftarray) {
     memcopy(val*sizeof(cell));
   } else {
-    check_userop(NULL,lval2.tag,lval3.tag,2,&lval3,&lval2.tag);
+    if (check_userop(NULL,(oper==NULL) ? lval2.tag : lval1->tag,lval3.tag,2,&lval3,&lval2.tag))
+      lval1->tag=lval2.tag; /* user-defined assignment operator can override the resulting tag */
     store(&lval3);      /* now, store the expression result */
   } /* if */
   if (!oper)
@@ -1063,6 +1118,15 @@ static int hier14(value *lval1)
   pc_sideeffect=TRUE;
   bitwise_opercount=bwcount;
   lval1->ident=iEXPRESSION;
+  if (oper==NULL) {
+    symbol *sym=lval3.sym;
+    assert(sym!=NULL);
+    if ((sym->usage & uASSIGNED)!=0 && sym->assignlevel>=pc_nestlevel && sym->vclass==sLOCAL)
+      error(240,sym->name); /* previously assigned value is unused */
+    markinitialized(sym,TRUE);
+    if (pc_ovlassignment)
+      markusage(sym,uREAD);
+  } /* if */
   return FALSE;         /* expression result is never an lvalue */
 }
 
@@ -1241,8 +1305,11 @@ static int hier2(value *lval)
     assert(lval->sym!=NULL);
     if ((lval->sym->usage & uCONST)!=0)
       return error(22);         /* assignment to const argument */
-    if (!check_userop(user_inc,lval->tag,0,1,lval,&lval->tag))
+    if (!check_userop(user_inc,lval->tag,0,1,lval,&lval->tag)) {
+      if (lval->tag==BOOLTAG)
+        error(247,"++",str_w247unary);  /* use of operator "++" on a "bool:" value */
       inc(lval);                /* increase variable first */
+    } /* if */
     rvalue(lval);               /* and read the result into PRI */
     pc_sideeffect=TRUE;
     return FALSE;               /* result is no longer lvalue */
@@ -1252,8 +1319,11 @@ static int hier2(value *lval)
     assert(lval->sym!=NULL);
     if ((lval->sym->usage & uCONST)!=0)
       return error(22);         /* assignment to const argument */
-    if (!check_userop(user_dec,lval->tag,0,1,lval,&lval->tag))
+    if (!check_userop(user_dec,lval->tag,0,1,lval,&lval->tag)) {
+      if (lval->tag==BOOLTAG)
+        error(247,"--",str_w247unary);  /* use of operator "--" on a "bool:" value */
       dec(lval);                /* decrease variable first */
+    } /* if */
     rvalue(lval);               /* and read the result into PRI */
     pc_sideeffect=TRUE;
     return FALSE;               /* result is no longer lvalue */
@@ -1264,6 +1334,8 @@ static int hier2(value *lval)
     lval->constval=~lval->constval;
     if (lval->ident==iVARIABLE || lval->ident==iARRAYCELL)
       lval->ident=iEXPRESSION;
+    if (lval->tag==BOOLTAG)
+      error(makelong(247,3),"~",str_w247unary,"!"); /* use of operator "~" on a "bool:" value; did you mean to use operator "!"? */
     return FALSE;
   case '!':                     /* ! (logical negate) */
     if (hier2(lval))
@@ -1274,7 +1346,7 @@ static int hier2(value *lval)
     } else {
       lneg();                   /* 0 -> 1,  !0 -> 0 */
       lval->constval=!lval->constval;
-      lval->tag=pc_addtag("bool");
+      lval->tag=BOOLTAG;
       if (lval->ident==iVARIABLE || lval->ident==iARRAYCELL)
         lval->ident=iEXPRESSION;
     } /* if */
@@ -1294,6 +1366,7 @@ static int hier2(value *lval)
         #else
           #error Unsupported cell size
         #endif
+        assert_static(sizeof(lval->constval)==sizeof(*f));
         *f= - *f; /* this modifies lval->constval */
       } else {
         /* the negation of a fixed point number is just an integer negation */
@@ -1303,10 +1376,12 @@ static int hier2(value *lval)
       lval->ident=iEXPRESSION;
       lval->constval=0;
     } else {
-      neg();                    /* arithmic negation */
+      neg();                    /* arithmetic negation */
       lval->constval=-lval->constval;
       if (lval->ident==iVARIABLE || lval->ident==iARRAYCELL)
         lval->ident=iEXPRESSION;
+      if (lval->tag==BOOLTAG)
+        error(makelong(247,3),"-",str_w247unary,"!"); /* use of operator "-" on a "bool:" value; did you mean to use operator "!"? */
     } /* if */
     return FALSE;
   case tLABEL:                  /* tagname override */
@@ -1316,7 +1391,6 @@ static int hier2(value *lval)
     lval->tag=tag;
     return lvalue;
   case t__ADDRESSOF: {
-    extern char *sc_tokens[];
     static const char allowed_sym_types[]="-variable, array, array cell, label or function-";
     paranthese=0;
     while (matchtoken('('))
@@ -1384,7 +1458,7 @@ static int hier2(value *lval)
             numoffsets+=offsmul;
             offsmul*=subsym->dim.array.length;
             arrayidx=(arrayidx*subsym->dim.array.length)+val;
-            subsym=finddepend(subsym);
+            subsym=subsym->child;
           }
           needtoken(']');
         } /* for */
@@ -1394,8 +1468,8 @@ static int hier2(value *lval)
           numoffsets+=offsmul;
           offsmul*=subsym->dim.array.length;
           arrayidx*=arrayidx*subsym->dim.array.length;
-          subsym=finddepend(subsym);
-        } /* if */
+          subsym=subsym->child;
+        } /* while */
         lval->constval+=(numoffsets-1+arrayidx)*(cell)sizeof(cell);
         ldconst(lval->constval,sPRI);
       } /* if */
@@ -1430,8 +1504,32 @@ static int hier2(value *lval)
     clear_value(lval);
     lval->ident=iCONSTEXPR;
     lval->constval= val;
-    lval->tag=pc_addtag("bool");
+    lval->tag=BOOLTAG;
     ldconst(lval->constval,sPRI);
+    while (paranthese--)
+      needtoken(')');
+    return FALSE;
+  case t__NAMEOF:
+    paranthese = 0;
+    while (matchtoken('('))
+      paranthese++;
+    tok=lex(&val, &st);
+    ldconst((litidx +glb_declared)*sizeof(cell),sPRI);
+    if (tok!=tSYMBOL)
+      return error_suggest(20, st, NULL, estNONSYMBOL, tok);    /* illegal symbol name */
+    sym = findloc(st);
+    if (sym==NULL)
+      sym=findglb(st, sSTATEVAR);
+    if (sym==NULL)
+      return error_suggest(17, st, NULL, estSYMBOL, esfVARCONST);   /* undefined symbol */
+    else if ((sym->usage & uDEFINE)==0)
+      return error_suggest(17, st, NULL, estSYMBOL, esfVARCONST);   /* undefined symbol (symbol is in the table, but it is "used" only) */
+    clear_value(lval);
+    for (tag=0; sym->name[tag]; ++tag)
+      litadd(sym->name[tag]);
+    litadd(0);
+    lval->ident=iARRAY;
+    lval->constval=-1-tag;
     while (paranthese--)
       needtoken(')');
     return FALSE;
@@ -1473,7 +1571,7 @@ static int hier2(value *lval)
         } /* if */
         needtoken(']');
         if (subsym!=NULL)
-          subsym=finddepend(subsym);
+          subsym=subsym->child;
       } /* for */
       if (level>sym->dim.array.level+1)
         error(28,sym->name);  /* invalid subscript */
@@ -1525,7 +1623,7 @@ static int hier2(value *lval)
         } /* if */
         needtoken(']');
         if (subsym!=NULL)
-          subsym=finddepend(subsym);
+          subsym=subsym->child;
       } /* for */
       if (level>sym->dim.array.level+1)
         error(28,sym->name);  /* invalid subscript */
@@ -1555,8 +1653,18 @@ static int hier2(value *lval)
       ob_eq();
       clear_value(lval);
       lval->ident=iEXPRESSION;
-      lval->tag=pc_addtag("bool");
+      lval->tag=BOOLTAG;
     } /* if */
+    return FALSE;
+  } /* case */
+  case t__STATIC_ASSERT:
+  case t__STATIC_CHECK: {
+    int use_warning=(tok==t__STATIC_CHECK);
+    clear_value(lval);
+    lval->ident=iCONSTEXPR;
+    lval->constval=do_static_check(use_warning);
+    lval->tag=BOOLTAG;
+    pc_sideeffect=TRUE;
     return FALSE;
   } /* case */
   case t__EMIT:
@@ -1608,8 +1716,11 @@ static int hier2(value *lval)
         rvalue(lval);           /* read current value into PRI */
         if (saveresult)
           swap1();              /* save PRI on the stack, restore address in PRI */
-        if (!check_userop(user_inc,lval->tag,0,1,lval,&lval->tag))
+        if (!check_userop(user_inc,lval->tag,0,1,lval,&lval->tag)) {
+          if (lval->tag==BOOLTAG)
+            error(247,"++",str_w247unary);  /* use of operator "++" on a "bool:" value */
           inc(lval);            /* increase variable afterwards */
+        } /* if */
         if (saveresult)
           popreg(sPRI);         /* restore PRI (result of rvalue()) */
         pc_sideeffect=TRUE;
@@ -1626,8 +1737,11 @@ static int hier2(value *lval)
         rvalue(lval);           /* read current value into PRI */
         if (saveresult)
           swap1();              /* save PRI on the stack, restore address in PRI */
-        if (!check_userop(user_dec,lval->tag,0,1,lval,&lval->tag))
+        if (!check_userop(user_dec,lval->tag,0,1,lval,&lval->tag)) {
+          if (lval->tag==BOOLTAG)
+            error(247,"--",str_w247unary);  /* use of operator "--" on a "bool:" value */
           dec(lval);            /* decrease variable afterwards */
+        } /* if */
         if (saveresult)
           popreg(sPRI);         /* restore PRI (result of rvalue()) */
         pc_sideeffect=TRUE;
@@ -1688,22 +1802,33 @@ restart:
       return FALSE;
     } /* if */
     if (tok=='[' || tok=='{') { /* subscript */
+      int invsubscript=FALSE;
       close = (char)((tok=='[') ? ']' : '}');
       if (sym==NULL) {  /* sym==NULL if lval is a constant or a literal */
         error(28,"<no variable>");  /* cannot subscript */
-        needtoken(close);
-        return FALSE;
-      } else if (sym->ident!=iARRAY && sym->ident!=iREFARRAY){
+        invsubscript=TRUE;
+      } else if (sym->ident!=iARRAY && sym->ident!=iREFARRAY) {
         error_suggest(28,sym->name,NULL,estSYMBOL,esfARRAY);/* cannot subscript, variable is not an array */
-        needtoken(close);
-        return FALSE;
+        invsubscript=TRUE;
       } else if (sym->dim.array.level>0 && close!=']') {
         error(51);      /* invalid subscript, must use [ ] */
-        needtoken(close);
-        return FALSE;
+        invsubscript=TRUE;
       } /* if */
-      /* set the tag to match (enumeration fields as indices) */
-      lval2.cmptag=sym->x.tags.index;
+      if (pc_loopcond!=0) {
+        /* stop counting variables that were used in loop condition,
+         * otherwise warnings 250 and 251 may be inaccurate */
+        pc_loopcond=0;
+        pc_numloopvars=0;
+      } /* if */
+      if (invsubscript) {
+        if (sym!=NULL && sym->ident!=iFUNCTN)
+          sym->usage |= uREAD;  /* avoid the "symbol is never used" warning */
+        if (matchtoken(close))
+          return FALSE;         /* return if there's no index sub-expression */
+      } else {
+        /* set the tag to match (enumeration fields as indices) */
+        lval2.cmptag=sym->x.tags.index;
+      } /* if */
       stgget(&index,&cidx);     /* mark position in code generator */
       pushreg(sPRI);            /* save base address of the array */
       if (hier14(&lval2))       /* create expression for the array index */
@@ -1711,6 +1836,18 @@ restart:
       if (lval2.ident==iARRAY || lval2.ident==iREFARRAY)
         error(33,lval2.sym->name);      /* array must be indexed */
       needtoken(close);
+      if (invsubscript) {
+        /* parse the next index if this is not the lowest array dimension */
+        if (sym!=NULL && (sym->ident==iARRAY || sym->ident==iREFARRAY) && sym->dim.array.level>0) {
+          lval1->ident=iREFARRAY;
+          lval1->sym=sym->child;
+          assert(lval1->sym!=NULL);
+          assert(lval1->sym->dim.array.level==sym->dim.array.level-1);
+          cursym=lval1->sym;
+          goto restart;
+        } /* if */
+        return FALSE;
+      } /* if */
       check_tagmismatch(sym->x.tags.index,lval2.tag,TRUE,-1);
       if (lval2.ident==iCONSTEXPR) {    /* constant expression */
         stgdel(index,cidx);             /* scratch generated code */
@@ -1752,11 +1889,11 @@ restart:
           } /* if */
           charalign();                  /* align character index into array */
         } /* if */
-        /* if the array index is a field from an enumeration, get the tag name
-         * from the field and save the size of the field too.
+        /* if the array index is a field from a named enumeration, get the tag
+         * name from the field and save the size of the field too.
          */
         assert(lval2.sym==NULL || lval2.sym->dim.array.level==0);
-        if (lval2.sym!=NULL && lval2.sym->dim.array.length>0 && sym->dim.array.level==0) {
+        if (lval2.sym!=NULL && lval2.sym->parent!=NULL && lval2.sym->dim.array.length>0 && sym->dim.array.level==0) {
           lval1->tag=lval2.sym->x.tags.index;
           lval1->constval=lval2.sym->dim.array.length;
         } /* if */
@@ -1790,7 +1927,7 @@ restart:
         ob_add();
         /* adjust the "value" structure and find the referenced array */
         lval1->ident=iREFARRAY;
-        lval1->sym=finddepend(sym);
+        lval1->sym=sym->child;
         assert(lval1->sym!=NULL);
         assert(lval1->sym->dim.array.level==sym->dim.array.level-1);
         cursym=lval1->sym;
@@ -1808,8 +1945,6 @@ restart:
       if (lval2.ident==iCONSTEXPR && lval2.sym!=NULL
           && lval2.sym->dim.array.length>0 && sym->dim.array.level==0)
       {
-        lval1->tag=lval2.sym->x.tags.index;
-        lval1->constval=lval2.sym->dim.array.length;
         if (lval2.tag==sym->x.tags.index && lval1->constval>1 && matchtoken('[')) {
           /* an array indexed with an enumeration field may be considered a sub-array */
           lexpush();
@@ -1855,8 +1990,9 @@ restart:
         } /* if */
       } else if ((sym->usage & uMISSING)!=0) {
         char symname[2*sNAMEMAX+16];  /* allow space for user defined operators */
+        char *ptr= (sym->documentation!=NULL) ? sym->documentation : "";
         funcdisplayname(symname,sym->name);
-        error(4,symname);             /* function not defined */
+        error(4,symname,ptr);         /* function not defined */
       } /* if */
       callfunction(sym,lval1,TRUE);
       return FALSE;             /* result of function call is no lvalue */
@@ -1895,16 +2031,30 @@ static int primary(value *lval)
   cell val;
   symbol *sym;
 
-  if (matchtoken('(')){         /* sub-expression - (expression,...) */
+  if (matchtoken('(')) {        /* sub-expression - (expression,...) */
+    int first=TRUE;
     PUSHSTK_I(sc_intest);
     PUSHSTK_I(sc_allowtags);
 
     sc_intest=FALSE;            /* no longer in "test" expression */
     sc_allowtags=TRUE;          /* allow tagnames to be used in parenthesized expressions */
     sc_allowproccall=FALSE;
-    do
+    do {
+      int org_ident=lval->ident;
+      /* overwrite current position in the staging buffer, so if the current
+       * sub-expression has a constant result, only the code for this
+       * sub-expression would get scrapped, not for the whole expression */
+      if (!first && org_ident!=iCONSTEXPR)
+        stgget(&lval_stgidx,&lval_cidx);
       lvalue=hier14(lval);
-    while (matchtoken(','));
+      /* if this in not the first sub-expression, the result of this sub-expression
+       * is a constant value, and the previous sub-expression wasn't constant,
+       * mark the result as iEXPRESSION, so the code for the whole expression
+       * won't get scrapped later */
+      if (!first && lval->ident==iCONSTEXPR && org_ident!=iCONSTEXPR)
+        lval->ident=iEXPRESSION;
+      first=FALSE;
+    } while (matchtoken(','));
     needtoken(')');
     lexclr(FALSE);              /* clear lex() push-back, it should have been
                                  * cleared already by needtoken() */
@@ -1918,12 +2068,12 @@ static int primary(value *lval)
   if (tok==tSYMBOL) {
     /* lastsymbol is char[sNAMEMAX+1], lex() should have truncated any symbol
      * to sNAMEMAX significant characters */
-    assert(strlen(st)<sizeof lastsymbol);
+    assert(strlen(st)<arraysize(lastsymbol));
     strcpy(lastsymbol,st);
   } /* if */
   if (tok==tSYMBOL && !findconst(st,NULL)) {
     /* first look for a local variable */
-    if ((sym=findloc(st))!=0) {
+    if ((sym=findloc(st))!=NULL) {
       if (sym->ident==iLABEL) {
         error(29);          /* expression error, assumed 0 */
         ldconst(0,sPRI);    /* load 0 */
@@ -1942,7 +2092,7 @@ static int primary(value *lval)
       } /* if */
     } /* if */
     /* now try a global variable */
-    if ((sym=findglb(st,sSTATEVAR))!=0) {
+    if ((sym=findglb(st,sSTATEVAR))!=NULL) {
       if (sym->ident==iFUNCTN || sym->ident==iREFFUNC) {
         /* if the function is only in the table because it was inserted as a
          * stub in the first pass (i.e. it was "used" but never declared or
@@ -1982,7 +2132,7 @@ static int primary(value *lval)
     return FALSE;       /* return 0 for function (not an lvalue) */
   } /* if */
   lexpush();            /* push the token, it is analyzed by constant() */
-  if (constant(lval)==0) {
+  if (!constant(lval)) {
     error(29);          /* expression error, assumed 0 */
     ldconst(0,sPRI);    /* load 0 */
   } /* if */
@@ -2096,9 +2246,15 @@ static int nesting=0;
     /* functions cannot be called at global scope */
     error(29); /* invalid expression, assumed zero */
     return;
-  }
+  } /* if */
+  if (pc_loopcond!=0) {
+    /* stop counting variables that were used in loop condition,
+     * otherwise warnings 249 and 250 may be inaccurate */
+    pc_loopcond=0;
+    pc_numloopvars=0;
+  } /* if */
   /* check whether this is a function that returns an array */
-  symret=finddepend(sym);
+  symret=sym->child;
   assert(symret==NULL || symret->ident==iREFARRAY);
   if (symret!=NULL) {
     int retsize;
@@ -2239,7 +2395,7 @@ static int nesting=0;
               nest_stkusage++;
             } /* if */
           } else if (lval.ident==iCONSTEXPR || lval.ident==iEXPRESSION
-                     || lval.ident==iARRAYCHAR)
+                     || (lval.ident==iARRAYCELL && !lvalue) || lval.ident==iARRAYCHAR)
           {
             /* fetch value if needed */
             if (lval.ident==iARRAYCHAR)
@@ -2291,9 +2447,9 @@ static int nesting=0;
           check_tagmismatch_multiple(arg[argidx].tags,arg[argidx].numtags,lval.tag,-1);
           if (lval.tag!=0)
             append_constval(&taglst,arg[argidx].name,lval.tag,0);
-          argidx++;               /* argument done */
-          if (lval.sym!=NULL)
+          if (lval.sym!=NULL && (arg[argidx].usage & uCONST)==0)
             markusage(lval.sym,uWRITTEN);
+          argidx++;               /* argument done */
           break;
         case iREFARRAY:
           if (lval.ident!=iARRAY && lval.ident!=iREFARRAY
@@ -2317,7 +2473,7 @@ static int nesting=0;
               if (arg[argidx].dim[0]!=0) {
                 assert(arg[argidx].dim[0]>0);
                 if (lval.ident==iARRAYCELL) {
-                  error(7);        /* array sizes must match */
+                  error(47);        /* array sizes must match */
                 } else {
                   assert(lval.constval!=0); /* literal array must have a size */
                   /* A literal array must have exactly the same size as the
@@ -2354,7 +2510,7 @@ static int nesting=0;
               else
                 check_index_tagmismatch(sym->name,arg[argidx].idxtag[level],sym->x.tags.index,TRUE,0);
               append_constval(&arrayszlst,arg[argidx].name,sym->dim.array.length,level);
-              sym=finddepend(sym);
+              sym=sym->child;
               assert(sym!=NULL);
               level++;
             } /* if */
@@ -2391,7 +2547,7 @@ static int nesting=0;
         close=!matchtoken(',');
         if (close) {              /* if not comma... */
           if (needtoken(tTERM)==1)/* ...must be end of statement */
-            lexpush();            /* push again, because end of statement is analised later */
+            lexpush();            /* push again, because end of statement is analyzed later */
         } /* if */
       } /* if */
     } while (!close && freading && !matchtoken(tENDEXPR)); /* do */
@@ -2605,7 +2761,7 @@ static int constant(value *lval)
   int cmptag=lval->cmptag;
 
   tok=lex(&val,&st);
-  if (tok==tSYMBOL && (sym=findconst(st,&cmptag))!=0) {
+  if (tok==tSYMBOL && (sym=findconst(st,&cmptag))!=NULL) {
     if (cmptag>1)
       error(91,sym->name);  /* ambiguity: multiple matching constants (different tags) */
     lval->constval=sym->addr;

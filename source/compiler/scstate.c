@@ -93,7 +93,7 @@ SC_FUNC constvalue *automaton_add(const char *name)
   constvalue *ptr;
   int last;
 
-  assert(strlen(name)<sizeof(ptr->name));
+  assert(strlen(name)<arraysize(ptr->name));
   ptr=find_automaton(name,&last);
   if (ptr==NULL) {
     assert(last+1 <= SHRT_MAX);
@@ -136,16 +136,16 @@ static constvalue *find_state(const char *name,int fsa,int *last)
   return NULL;
 }
 
-SC_FUNC constvalue *state_add(const char *name,int fsa)
+SC_FUNC constvalue *state_add(const char *name,int fsa_id)
 {
   constvalue *ptr;
   int last;
 
-  assert(strlen(name)<sizeof(ptr->name));
-  ptr=find_state(name,fsa,&last);
+  assert(strlen(name)<arraysize(ptr->name));
+  ptr=find_state(name,fsa_id,&last);
   if (ptr==NULL) {
-    assert(fsa <= SHRT_MAX);
-    ptr=append_constval(&sc_state_tab,name,(cell)(last+1),(short)fsa);
+    assert(fsa_id <= SHRT_MAX);
+    ptr=append_constval(&sc_state_tab,name,(cell)(last+1),(short)fsa_id);
   } /* if */
   return ptr;
 }

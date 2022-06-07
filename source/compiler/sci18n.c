@@ -57,10 +57,6 @@
   #endif
 #endif
 
-#if !defined ELEMENTS
-  #define ELEMENTS(array)       (sizeof(array) / sizeof(array[0]))
-#endif
-
 #if !defined NO_CODEPAGE
 
 #if !defined MAXCODEPAGE
@@ -108,7 +104,7 @@ static int cp_readline(FILE *fp,char *string,size_t size)
 /* cp_path() sets the directory where all codepage files must be found (if
  * the parameter to cp_set() specifies a full path, that is used instead).
  * The path is specified into two parts: root and directory; the full path
- * for the codepage direcory is just the concatenation of the two, with a
+ * for the codepage directory is just the concatenation of the two, with a
  * directory separator in between. The directory is given in two parts,
  * because often a program already retrieves its "home" directory and the
  * codepages are most conveniently stored in a subdirectory of this home
@@ -169,7 +165,7 @@ SC_FUNC int cp_set(const char *name)
       wordtablesize=0;
       wordtabletop=0;
     } /* if */
-    for (index=0; index<ELEMENTS(bytetable); index++)
+    for (index=0; index<arraysize(bytetable); index++)
       bytetable[index]=(wchar_t)index;
     return TRUE;
   } /* if */
@@ -216,7 +212,7 @@ SC_FUNC int cp_set(const char *name)
     return FALSE;       /* all failed */
 
   /* clear the tables */
-  for (index=0; index<ELEMENTS(bytetable); index++)
+  for (index=0; index<arraysize(bytetable); index++)
     bytetable[index]=INVALID;   /* special code meaning "not found" */
   assert(wordtablesize==0 && wordtabletop==0 && wordtable==NULL
          || wordtablesize>0 && wordtable!=NULL);
@@ -228,7 +224,7 @@ SC_FUNC int cp_set(const char *name)
   } /* if */
 
   /* read in the table */
-  while (cp_readline(fp,filename,sizeof filename)) {
+  while (cp_readline(fp,filename,arraysize(filename))) {
     char *ptr;
     if ((ptr=strchr(filename,'#'))!=NULL)
       *ptr='\0';                /* strip of comment */
@@ -332,7 +328,7 @@ SC_FUNC cell get_utf8_char(const unsigned char *string,const unsigned char **end
       if (--follow==0) {
         /* encoding a character in more bytes than is strictly needed,
          * is not really valid UTF-8; we are strict here to increase
-         * the chance of heuristic dectection of non-UTF-8 text
+         * the chance of heuristic detection of non-UTF-8 text
          * (JAVA writes zero bytes as a 2-byte code UTF-8, which is invalid)
          */
         if (result<lowmark)
