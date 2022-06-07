@@ -116,6 +116,14 @@
 #if !defined assert_static
   #if (defined __STDC_VERSION__ && __STDC_VERSION__ >= 201112) || GCC_VERSION >= 40600 || __clang__
     #define assert_static(test) _Static_assert(test, "assert")
+  #elif defined _MSC_VER
+    /* see "Compile-Time Assertions" by Ralf Holly,
+     * C/C++ Users Journal, November 2004
+     */
+    #define assert_static(e) \
+      do { \
+        enum { assert_static__ = 1/(e) }; \
+      } while (0)
   #else
     /* see "Compile-Time Assertions" by Greg Miller,
      * (with modifications to port it to C)
