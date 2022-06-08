@@ -1440,7 +1440,7 @@ static int command(void)
       insert_dbgline(fline);
       while (*lptr<=' ' && *lptr!='\0')
         lptr++;
-      for (i=0; i<arraysize(name)-1 && (isalpha(*lptr) || *lptr=='.'); i++,lptr++)
+      for (i=0; i<arraysize(name)-1 && (isalnum(*lptr) || *lptr=='.'); i++,lptr++)
         name[i]=(char)tolower(*lptr);
       name[i]='\0';
       stgwrite("\t");
