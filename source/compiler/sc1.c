@@ -1214,6 +1214,8 @@ static void parseoptions(int argc,char **argv,char *oname,char *ename,char *pnam
         pc_optimize=*option_value(ptr) - '0';
         if (pc_optimize<sOPTIMIZE_NONE || pc_optimize>=sOPTIMIZE_NUMBER)
           invalid_option(ptr);
+        add_builtin_constant("__optimization", pc_optimize, sGLOBAL, 0);
+        add_builtin_constant("__optimisation", pc_optimize, sGLOBAL, 0);
         break;
       case 'p':
         if (pname)
@@ -1682,6 +1684,8 @@ static void setconstants(void)
   else if ((sc_debug & sCHKBOUNDS)==sCHKBOUNDS)
     debug=1;
   add_builtin_constant("debug",debug,sGLOBAL,0);
+  add_builtin_constant("__optimization", pc_optimize,sGLOBAL,0);
+  add_builtin_constant("__optimisation", pc_optimize,sGLOBAL,0);
 
   append_constval(&sc_automaton_tab,"",0,0);    /* anonymous automaton */
 }
