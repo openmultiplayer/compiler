@@ -426,6 +426,9 @@ int AMXAPI amx_Flags(AMX *amx,uint16_t *flags)
     return AMX_ERR_FORMAT;
   if (hdr->file_version>CUR_FILE_VERSION || hdr->amx_version<MIN_FILE_VERSION)
     return AMX_ERR_VERSION;
+  if (hdr->file_version==9 && hdr->amx_version==9)
+    /* special check for old compiler code using `-O2` */
+    return AMX_ERR_VERSION;
   *flags=hdr->flags;
   return AMX_ERR_NONE;
 }
@@ -910,6 +913,9 @@ int AMXAPI amx_Init(AMX *amx,void *program)
     return AMX_ERR_FORMAT;
   if (hdr->file_version>CUR_FILE_VERSION || hdr->amx_version<MIN_FILE_VERSION)
     return AMX_ERR_VERSION;
+  if (hdr->file_version==9 && hdr->amx_version==9)
+    /* special check for old compiler code using `-O2` */
+    return AMX_ERR_VERSION;
   if (hdr->defsize!=sizeof(AMX_FUNCSTUB) && hdr->defsize!=sizeof(AMX_FUNCSTUBNT))
     return AMX_ERR_FORMAT;
   if (USENAMETABLE(hdr)) {
@@ -1240,6 +1246,9 @@ int AMXAPI amx_Clone(AMX *amxClone, AMX *amxSource, void *data)
     return AMX_ERR_FORMAT;
   if (hdr->file_version>CUR_FILE_VERSION || hdr->amx_version<MIN_FILE_VERSION)
     return AMX_ERR_VERSION;
+  if (hdr->file_version==9 && hdr->amx_version==9)
+    /* special check for old compiler code using `-O2` */
+    return AMX_ERR_VERSION;
 
   /* set initial values */
   amxClone->base=amxSource->base;
@@ -1279,6 +1288,9 @@ int AMXAPI amx_MemInfo(AMX *amx, long *codesize, long *datasize, long *stackheap
   if (hdr->magic!=AMX_MAGIC)
     return AMX_ERR_FORMAT;
   if (hdr->file_version>CUR_FILE_VERSION || hdr->amx_version<MIN_FILE_VERSION)
+    return AMX_ERR_VERSION;
+  if (hdr->file_version==9 && hdr->amx_version==9)
+    /* special check for old compiler code using `-O2` */
     return AMX_ERR_VERSION;
 
   if (codesize!=NULL)
