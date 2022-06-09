@@ -1084,6 +1084,10 @@ int AMXAPI amx_Init(AMX *amx,void *program)
       lib->address=(ucell)hlib;
     } /* for */
   #endif
+  /* save the flags back so they can be read in scrip
+   *
+   */
+  hdr->flags = amx->flags;
 
   return AMX_ERR_NONE;
 }
