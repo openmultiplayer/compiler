@@ -289,6 +289,10 @@ typedef enum {
   OP_CONST,
   OP_CONST_S,
   /* ----- */
+  /* these are unused now, but we need to keep the placeholders in the enum */
+  _OP_SYSREQ_D,
+  _OP_SYSREQ_ND,
+  /* ----- */
   OP_NUM_OPCODES
 } OPCODE;
 
