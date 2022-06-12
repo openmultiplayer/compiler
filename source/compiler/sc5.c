@@ -244,9 +244,9 @@ static int errwarn;
  */
 SC_FUNC int error(long number,...)
 {
-static char *prefix[3]={ "error", "fatal error", "warning" };
-static int lastline,errorcount;
-static short lastfile;
+  static char *prefix[3]={ "error", "fatal error", "warning" };
+  static int lastline,errorcount;
+  static short lastfile;
   char *msg,*pre;
   va_list argptr;
   char string[128];
@@ -328,7 +328,7 @@ static short lastfile;
       /* don't use `fatal error 111: user error:` redundant prefix */
       if (number==111 || number==237)
         fprintf(fp,"%s(%d) : ",inpfname,errline);
-      if (start>=0 && start!=errline)
+      else if (start>=0 && start!=errline)
         fprintf(fp,"%s(%d -- %d) : %s %03d: ",inpfname,start,errline,pre,(int)number);
       else
         fprintf(fp,"%s(%d) : %s %03d: ",inpfname,errline,pre,(int)number);

@@ -129,7 +129,7 @@ int pc_printf(const char *message,...)
  */
 int pc_error(int number,char *message,char *filename,int firstline,int lastline,va_list argptr)
 {
-static char *prefix[3]={ "error", "fatal error", "warning" };
+  static char *prefix[3]={ "error", "fatal error", "warning" };
 
   if (number!=0) {
     char *pre;
@@ -138,7 +138,9 @@ static char *prefix[3]={ "error", "fatal error", "warning" };
     if (number>=200 && pc_geterrorwarnings()){
       pre=prefix[0];
     }
-    if (firstline>=0)
+    if (number == 111 || number == 237)
+      fprintf(stderr,"%s(%d) : ",filename,lastline);
+    else if (firstline>=0)
       fprintf(stderr,"%s(%d -- %d) : %s %03d: ",filename,firstline,lastline,pre,number);
     else
       fprintf(stderr,"%s(%d) : %s %03d: ",filename,lastline,pre,number);
