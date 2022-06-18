@@ -1087,10 +1087,6 @@ int AMXAPI amx_Init(AMX *amx,void *program)
       lib->address=(ucell)hlib;
     } /* for */
   #endif
-  /* save the flags back so they can be read in scrip
-   *
-   */
-  hdr->flags = amx->flags;
 
   return AMX_ERR_NONE;
 }
@@ -2154,6 +2150,10 @@ static const void * const amx_opcodelist[] = {
       break;
     case 6:
       pri=(cell)((unsigned char *)cip - code);
+      break;
+    /* registers 7 and 8 are used by JIT */
+    case 9:
+      pri=(cell)amx->flags;
       break;
     } /* switch */
     NEXT(cip);
@@ -3308,6 +3308,10 @@ int AMXAPI amx_Exec(AMX *amx, cell *retval, int index)
         break;
       case 6:
         pri=(cell)((unsigned char *)cip - code);
+        break;
+      /* registers 7 and 8 are used by JIT */
+      case 9:
+        pri=(cell)amx->flags;
         break;
       } /* switch */
       break;
