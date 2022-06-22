@@ -671,9 +671,10 @@ static cell AMX_NATIVE_CALL n_strval(AMX *amx,const cell *params)
 static cell AMX_NATIVE_CALL n_valstr(AMX *amx,const cell *params)
 {
   TCHAR str[50];
-  cell value,temp;
+  cell value;
   cell *cstr;
   int len,result,negate=0;
+  unsigned int temp;
 
   (void)(amx);
   /* find out how many digits are needed */
@@ -682,18 +683,25 @@ static cell AMX_NATIVE_CALL n_valstr(AMX *amx,const cell *params)
   if (value<0) {
     negate=1;
     len++;
-    value=-value;
+    temp=(unsigned int)-value;
+  } else {
+    temp=(unsigned int)value;
   } /* if */
-  for (temp=value; temp>=10; temp/=10)
+  for (; temp>=10; temp/=10)
     len++;
   assert(len<=sizearray(str));
 
   /* put in the string */
+  if (value<0)
+    temp=(unsigned int)-value;
+  else
+    temp=(unsigned int)value;
+
   result=len;
   str[len--]='\0';
   while (len>=negate) {
-    str[len--]=(char)((value % 10)+'0');
-    value/=10;
+    str[len--]=(TCHAR)((temp % 10)+'0');
+    temp/=10;
   } /* while */
   if (negate)
     str[0]='-';
