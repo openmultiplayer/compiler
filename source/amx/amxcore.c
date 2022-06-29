@@ -40,6 +40,8 @@
 #endif
 #if defined __WIN32__ || defined _WIN32 || defined WIN32 || defined _Windows
   #include <windows.h>
+#else
+  #include <wctype.h>
 #endif
 
 /* A few compilers do not provide the ANSI C standard "time" functions */
@@ -277,9 +279,7 @@ static cell AMX_NATIVE_CALL core_tolower(AMX *amx,const cell *params)
   #elif defined _Windows && !defined _WIN64
     return (cell)AnsiLower((LPSTR)params[1]);
   #else
-    if ((unsigned)(params[1]-'A')<26u)
-      return params[1]+'a'-'A';
-    return params[1];
+    return towlower(params[1]);
   #endif
 }
 
@@ -291,9 +291,7 @@ static cell AMX_NATIVE_CALL core_toupper(AMX *amx, const cell *params)
   #elif defined _Windows && !defined _WIN64
     return (cell)AnsiUpper((LPSTR)params[1]);
   #else
-    if ((unsigned)(params[1]-'a')<26u)
-      return params[1]+'A'-'a';
-    return params[1];
+    return towupper(params[1]);
   #endif
 }
 
