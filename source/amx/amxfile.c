@@ -632,7 +632,9 @@ static cell AMX_NATIVE_CALL n_fgetchar(AMX *amx, const cell *params)
   size_t result;
 
   (void)amx;
-  if (params[2]) {
+  /* old declarations were incorrectly: fgetchar(File:handle, value, bool:utf8 = true) */
+  /* this handles both versions by trying to work out which is used */
+  if (params[0] == 12 ? params[3] : params[2]) {
     result=fgets_cell((FILE*)params[1],str,2,1);
   } else {
     str[0]=fgetc((FILE*)params[1]);
