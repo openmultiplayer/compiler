@@ -749,6 +749,27 @@ static cell AMX_NATIVE_CALL n_ftell(AMX *amx, const cell *params)
   return (cell)ftell((FILE *)params[1]);
 }
 
+/* ftouch(const name[]) */
+static cell AMX_NATIVE_CALL n_ftouch(AMX *amx, const cell *params)
+{
+  if (!params[1]) {
+      return 0;
+  }
+  TCHAR *name,fullname[_MAX_PATH];
+  FILE *f = NULL;
+
+  (void)amx;
+  /* get the filename */
+  amx_StrParam(amx,params[1],name);
+  if (name!=NULL && completename(fullname,name,sizearray(fullname))!=NULL) {
+    f=_tfopen(fullname,__T("wb"));
+    if (f!=NULL) {
+      return fclose(f) == 0;
+    }
+  } /* if */
+  return 0;
+}
+
 /* bool: fremove(const name[]) */
 static cell AMX_NATIVE_CALL n_fremove(AMX *amx, const cell *params)
 {
@@ -1310,6 +1331,9 @@ AMX_NATIVE_INFO file_Natives[] = {
   { "writecfgvalue",n_writecfgvalue },
   { "deletecfg",    n_deletecfg },
   { "ftell",        n_ftell },
+  { "ffind",        n_ffind },
+  { "dfind",        n_dfind },
+  { "ftouch",       n_ftouch },
   { NULL, NULL }        /* terminator */
 };
 
