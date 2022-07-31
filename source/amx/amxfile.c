@@ -868,9 +868,11 @@ static int matchfiles(const TCHAR *path,int skip,TCHAR *out,int outlen)
         if (fpattern_match(basename,fd.cFileName,-1,FALSE)) {
           count++;
           if (match_optcopy(out,outlen,fd.cFileName,skip--))
-            break;
+            goto matchfiles_found;
         } /* if */
       } while (FindNextFile(hfind,&fd));
+      *out = '\0';
+matchfiles_found:
       FindClose(hfind);
     } /* if */
   #else
@@ -886,9 +888,11 @@ static int matchfiles(const TCHAR *path,int skip,TCHAR *out,int outlen)
         if (fpattern_match(basename,entry->d_name,-1,TRUE)) {
           count++;
           if (match_optcopy(out,outlen,entry->d_name,skip--))
-            break;
+            goto matchfiles_found;
         } /* if */
       } /* while */
+      *out = '\0';
+matchfiles_found:
       closedir(dir);
     } /* if */
   #endif
