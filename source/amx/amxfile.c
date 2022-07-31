@@ -838,7 +838,7 @@ static int match_optcopy(TCHAR *out,int outlen,const TCHAR *in,int skip)
   return 1;
 }
 
-static int matchfiles(const TCHAR *path,int skip,TCHAR *out,int outlen)
+static int matchfiles(const TCHAR *path,int skip,TCHAR *out,int outlen,int files,int dirs)
 {
   int count=0;
   const TCHAR *basename;
@@ -866,9 +866,11 @@ static int matchfiles(const TCHAR *path,int skip,TCHAR *out,int outlen)
     if ((hfind=FindFirstFile(path,&fd))!=INVALID_HANDLE_VALUE) {
       do {
         if (fpattern_match(basename,fd.cFileName,-1,FALSE)) {
-          count++;
-          if (match_optcopy(out,outlen,fd.cFileName,skip--))
-            goto matchfiles_found;
+          if ((fd.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY)?dirs:files) {
+            count++;
+            if (match_optcopy(out,outlen,fd.cFileName,skip--))
+              goto matchfiles_found;
+          } /* if */
         } /* if */
       } while (FindNextFile(hfind,&fd));
       *out = '\0';
@@ -886,9 +888,11 @@ matchfiles_found:
     if ((dir=opendir(dirname))!=NULL) {
       while ((entry=readdir(dir))!=NULL) {
         if (fpattern_match(basename,entry->d_name,-1,TRUE)) {
-          count++;
-          if (match_optcopy(out,outlen,entry->d_name,skip--))
-            goto matchfiles_found;
+          if ((entry->d_type==DT_DIR)?dirs:files) {
+            count++;
+            if (match_optcopy(out,outlen,entry->d_name,skip--))
+              goto matchfiles_found;
+          } /* if */
         } /* if */
       } /* while */
       *out = '\0';
@@ -921,12 +925,54 @@ static cell AMX_NATIVE_CALL n_fmatch(AMX *amx, const cell *params)
   (void)amx;
   amx_StrParam(amx,params[2],name);
   if (name!=NULL && completename(fullname,name,sizearray(fullname))!=NULL) {
-    if (!matchfiles(fullname,params[3],fullname,sizearray(fullname))) {
+    if (!matchfiles(fullname,params[3],fullname,sizearray(fullname),1,1)) {
       fullname[0]='\0';
     } else {
       /* copy the string into the destination */
       cptr=amx_Address(amx,params[1]);
       amx_SetString(cptr,fullname,1,0,params[4]);
+    } /* if */
+  } /* if */
+  return fullname[0]!='\0';
+}
+
+/* bool: ffind(const pattern[], filename[], maxlength = sizeof (filename), &index) */
+static cell AMX_NATIVE_CALL n_ffind(AMX *amx, const cell *params)
+{
+  TCHAR *name,fullname[_MAX_PATH]="";
+  cell *cptr;
+
+  (void)amx;
+  amx_StrParam(amx,params[1],name);
+  cptr=amx_Address(amx,params[4]);
+  if (name!=NULL && completename(fullname,name,sizearray(fullname))!=NULL) {
+    if (!(*cptr=matchfiles(fullname,*cptr,fullname,sizearray(fullname),1,0))) {
+      fullname[0]='\0';
+    } else {
+      /* copy the string into the destination */
+      cptr=amx_Address(amx,params[2]);
+      amx_SetString(cptr,fullname,1,0,params[3]);
+    } /* if */
+  } /* if */
+  return fullname[0]!='\0';
+}
+
+/* bool: dfind(const pattern[], filename[], maxlength = sizeof (filename), &index) */
+static cell AMX_NATIVE_CALL n_dfind(AMX *amx, const cell *params)
+{
+  TCHAR *name,fullname[_MAX_PATH]="";
+  cell *cptr;
+
+  (void)amx;
+  amx_StrParam(amx,params[1],name);
+  cptr=amx_Address(amx,params[4]);
+  if (name!=NULL && completename(fullname,name,sizearray(fullname))!=NULL) {
+    if (!(*cptr=matchfiles(fullname,*cptr,fullname,sizearray(fullname),0,1))) {
+      fullname[0]='\0';
+    } else {
+      /* copy the string into the destination */
+      cptr=amx_Address(amx,params[2]);
+      amx_SetString(cptr,fullname,1,0,params[3]);
     } /* if */
   } /* if */
   return fullname[0]!='\0';
