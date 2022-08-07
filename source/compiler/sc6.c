@@ -55,6 +55,7 @@ typedef struct {
 static cell codeindex;  /* similar to "code_idx" */
 static cell *lbltab;    /* label table */
 static int writeerror;
+static int longest_name=0; /* so the nametable is never too big */
 static int bytes_in, bytes_out;
 static jmp_buf compact_err;
 
@@ -798,7 +799,10 @@ SC_FUNC int assemble(FILE *fout,FILE *fin)
         assert(strlen(sym->name)<=sNAMEMAX);
         strcpy(alias,sym->name);
       } /* if */
-      nametablesize+=strlen(alias)+1;
+      int symbollen=strlen(alias);
+      if (symbollen>longest_name)
+        longest_name=symbollen;
+      nametablesize+=symbollen+1;
     } /* if */
   } /* for */
   assert(numnatives==ntv_funcid);
@@ -810,7 +814,10 @@ SC_FUNC int assemble(FILE *fout,FILE *fin)
       if (constptr->value>0) {
         assert(!strempty(constptr->name));
         numlibraries++;
-        nametablesize+=strlen(constptr->name)+1;
+        int symbollen=strlen(constptr->name);
+        if (symbollen>longest_name)
+          longest_name=symbollen;
+        nametablesize+=symbollen+1;
       } /* if */
     } /* for */
   } /* if */
@@ -821,7 +828,10 @@ SC_FUNC int assemble(FILE *fout,FILE *fin)
     if ((constptr->value & PUBLICTAG)!=0) {
       assert(!strempty(constptr->name));
       numtags++;
-      nametablesize+=strlen(constptr->name)+1;
+      int symbollen=strlen(constptr->name);
+      if (symbollen>longest_name)
+        longest_name=symbollen;
+      nametablesize+=symbollen+1;
     } /* if */
   } /* for */
 
@@ -1008,7 +1018,7 @@ SC_FUNC int assemble(FILE *fout,FILE *fin)
   /* write the "maximum name length" field in the name table */
   assert(nameofs==hdr.nametable+nametablesize);
   pc_resetbin(fout,hdr.nametable);
-  count=sNAMEMAX;
+  count=longest_name;
   #if BYTE_ORDER==BIG_ENDIAN
     align16(&count);
   #endif
