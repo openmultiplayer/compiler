@@ -4247,7 +4247,7 @@ static int argcompare(arginfo *a1,arginfo *a2)
  */
 static int declargs(symbol *sym,int chkshadow)
 {
-  #define MAXTAGS 16
+  #define MAXTAGS 256
   char *ptr;
   int argcnt,oldargcnt,tok,tags[MAXTAGS],numtags;
   cell val;
