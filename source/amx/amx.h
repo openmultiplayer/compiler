@@ -515,7 +515,7 @@ enum {
             (result) = const_cast<char*>("");                                                                                  \
     } while (0)
 
-#define amx_NumParams(params) ((params)[0] / sizeof(cell))
+#define amx_NumParams(params) ((params)[0] / (cell)sizeof(cell))
 
 uint16_t * AMXAPI amx_Align16(uint16_t *v);
 uint32_t * AMXAPI amx_Align32(uint32_t *v);
