@@ -801,7 +801,10 @@ static int amx_BrowseRelocate(AMX *amx)
 
   amx->flags &= ~AMX_FLAG_BROWSE;
   amx->flags |= AMX_FLAG_RELOC;
-  amx->flags |= AMX_FLAG_SYSREQD;
+  amx->flags |= AMX_FLAG_NO_SYSREQD;
+  #if defined AMX_DONT_RELOCATE
+    amx->flags |= AMX_FLAG_NO_RELOC;
+  #endif
   if (sysreq_flg & 0x02)
     amx->flags |= AMX_FLAG_SYSREQN;
   return AMX_ERR_NONE;
@@ -883,7 +886,7 @@ int AMXAPI amx_Init(AMX *amx,void *program)
       #endif
     #endif
     int numlibraries,i;
-    AMX_FUNCPART *lib;
+    AMX_LIBWIDE* lib;
     AMX_ENTRY libinit;
   #endif
 
@@ -1044,7 +1047,7 @@ int AMXAPI amx_Init(AMX *amx,void *program)
     hdr=(AMX_HEADER *)amx->base;
     numlibraries=NUMENTRIES(hdr,libraries,pubvars);
     for (i=0; i<numlibraries; i++) {
-      lib=GETENTRY(hdr,libraries,i);
+      lib = (AMX_LIBWIDE*)GETENTRY(hdr, libraries, i);
       libname[0]='\0';
       #if defined LINUX || defined __FreeBSD__ || defined __OpenBSD__
         if (root!=NULL && *root!='\0') {
@@ -1084,7 +1087,7 @@ int AMXAPI amx_Init(AMX *amx,void *program)
         if (libinit!=NULL)
           libinit(amx);
       } /* if */
-      lib->address=(ucell)hlib;
+      lib->address=(uintptr_t)hlib;
     } /* for */
   #endif
 
@@ -1195,7 +1198,7 @@ int AMXAPI amx_Cleanup(AMX *amx)
     #endif
     AMX_HEADER *hdr;
     int numlibraries,i;
-    AMX_FUNCPART *lib;
+    AMX_LIBWIDE* lib;
     AMX_ENTRY libcleanup;
   #endif
 
@@ -1205,7 +1208,7 @@ int AMXAPI amx_Cleanup(AMX *amx)
     assert(hdr->magic==AMX_MAGIC);
     numlibraries=NUMENTRIES(hdr,libraries,pubvars);
     for (i=0; i<numlibraries; i++) {
-      lib=GETENTRY(hdr,libraries,i);
+      lib=(AMX_LIBWIDE*)GETENTRY(hdr,libraries,i);
       if (lib->address!=0) {
         char funcname[sNAMEMAX+12]; /* +1 for '\0', +4 for 'amx_', +7 for 'Cleanup' */
         strcpy(funcname,"amx_");

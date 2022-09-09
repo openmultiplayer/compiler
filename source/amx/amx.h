@@ -217,6 +217,12 @@ extern  "C" {
   #error Unsupported cell size (PAWN_CELL_SIZE)
 #endif
 
+#if defined __64BIT__ && PAWN_CELL_SIZE < 64
+  #define AMX_DONT_RELOCATE
+#elif defined __32BIT__ && PAWN_CELL_SIZE < 32
+  #define AMX_DONT_RELOCATE
+#endif
+
 #define UNPACKEDMAX   (((ucell)1 << (sizeof(ucell)-1)*8) - 1)
 #define UNLIMITED     (~1u >> 1)
 
@@ -299,6 +305,10 @@ typedef struct tagFUNCPART {
 typedef struct tagFUNCWIDE {
   AMX_NATIVE address    PACKED;
 } AMX_FUNCWIDE;
+
+typedef struct tagLIBWIDE {
+  uintptr_t address    PACKED;
+} AMX_LIBWIDE;
 
 /* The AMX structure is the internal structure for many functions. Not all
  * fields are valid at all times; many fields are cached in local variables.
@@ -431,7 +441,8 @@ enum {
 #define AMX_FLAG_COMPACT  0x04  /* compact encoding */
 #define AMX_FLAG_SLEEP    0x08  /* script uses the sleep instruction (possible re-entry or power-down mode) */
 #define AMX_FLAG_NOCHECKS 0x10  /* no array bounds checking; no BREAK opcodes */
-#define AMX_FLAG_SYSREQD 0x400  /* SYSREQ.D is NOT used */
+#define AMX_FLAG_NO_RELOC 0x200 /* no reallocations done, set when the native pointer size is larger than a cell */
+#define AMX_FLAG_NO_SYSREQD 0x400 /* SYSREQ.D is NOT used */
 #define AMX_FLAG_SYSREQN 0x800  /* script new (optimized) version of SYSREQ opcode */
 #define AMX_FLAG_NTVREG 0x1000  /* all native functions are registered */
 #define AMX_FLAG_JITC   0x2000  /* abstract machine is JIT compiled */
@@ -461,21 +472,8 @@ enum {
   // amx_ftoc() and amx_ctof() cannot be used
 #endif
 
-/* when a pointer cannot be stored in a cell, cells that hold relocated
- * addresses need to be expanded
- */
-#if defined __64BIT__ && PAWN_CELL_SIZE<64
-  #define CELLMASK      (((int64_t)1 << PAWN_CELL_SIZE) - 1)
-  #define amx_Address(amx,addr) \
-                        (cell*)(((int64_t)((amx)->data ? (amx)->data : (amx)->code) & ~CELLMASK) | ((int64_t)(addr) & CELLMASK))
-#elif defined __32BIT__ && PAWN_CELL_SIZE<32
-  #define CELLMASK      ((1L << PAWN_CELL_SIZE) - 1)
-  #define amx_Address(amx,addr) \
-                        (cell*)(((int32_t)((amx)->data ? (amx)->data : (amx)->code) & ~CELLMASK) | ((int32_t)(addr) & CELLMASK))
-#else
-  #define amx_Address(amx,addr) \
-                        (cell*)(((int32_t)((amx)->data ? (amx)->data : (amx)->base+(int)((AMX_HEADER *)(amx)->base)->dat)) + ((int32_t)(addr)))
-#endif
+#define amx_Address(amx,addr) \
+                        (cell*)(((uintptr_t)((amx)->data ? (amx)->data : (amx)->base+(int)((AMX_HEADER *)(amx)->base)->dat)) + ((uintptr_t)(addr)))
 
 #if defined __STDC_VERSION__ && __STDC_VERSION__ >= 199901L
   /* C99: use variable-length arrays */
