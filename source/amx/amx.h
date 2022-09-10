@@ -219,8 +219,10 @@ extern  "C" {
 
 #if defined __64BIT__ && PAWN_CELL_SIZE < 64
   #define AMX_DONT_RELOCATE
+  #define AMX_WIDE_POINTERS
 #elif defined __32BIT__ && PAWN_CELL_SIZE < 32
   #define AMX_DONT_RELOCATE
+  #define AMX_WIDE_POINTERS
 #endif
 
 #define UNPACKEDMAX   (((ucell)1 << (sizeof(ucell)-1)*8) - 1)

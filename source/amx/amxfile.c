@@ -149,6 +149,94 @@ enum seek_whence {
   seek_end,
 };
 
+#if defined AMX_WIDE_POINTERS
+  /* can't return file pointers as a cell, use a table instead */
+  typedef struct tagFILE_LIST {
+    cell fno;
+    FILE* fhnd;
+  } FILE_LIST;
+
+  static FILE_LIST* gFileList = 0;
+  static size_t gFileCount = 0;
+  static size_t gFileCapacity = 0;
+  static cell gFileNext = 0;
+
+  static cell amxfile_AddPointer(FILE* fhnd)
+  {
+    if (gFileCapacity == 0) {
+      // Create the LUT.
+      gFileCapacity = 4;
+      gFileList = (FILE_LIST*)malloc(gFileCapacity * sizeof(FILE_LIST));
+    } else if (gFileCount == gFileCapacity) {
+      // Expand the LUT.
+      gFileCapacity *= 2;
+      FILE_LIST* next = (FILE_LIST*)malloc(gFileCapacity * sizeof(FILE_LIST));
+      memmove(next, gFileList, gFileCount * sizeof(FILE_LIST));
+      free(gFileList);
+      gFileList = next;
+    }
+    // Append the data.
+    ++gFileNext;
+    if (gFileNext < 0) {
+      printf("fopen handle overflow");
+      return 0;
+    }
+    gFileList[gFileCount].fno = gFileNext;
+    gFileList[gFileCount].fhnd = fhnd;
+    ++gFileCount;
+    return gFileNext;
+  }
+
+  static FILE* amxfile_GetPointer(cell fno)
+  {
+    // Binary search
+    size_t first = 0;
+    size_t last = gFileCount - 1;
+    size_t mid = 0;
+    
+    while (first <= last) {
+      mid = (first + last) / 2;
+      
+      cell diff = gFileList[mid].fno - fno;
+      if (diff < 0) {
+        first = mid + 1;
+      } else if (diff > 0) {
+        last = mid - 1;
+      } else {
+        return gFileList[mid].fhnd;
+      }
+    }
+    return 0;
+  }
+
+  static FILE* amxfile_RemovePointer(cell fno)
+  {
+    // Binary search
+    size_t first = 0;
+    size_t last = gFileCount - 1;
+    size_t mid = 0;
+    
+    while (first <= last) {
+      mid = (first + last) / 2;
+      
+      cell diff = gFileList[mid].fno - fno;
+      if (diff < 0) {
+        first = mid + 1;
+      } else if (diff > 0) {
+        last = mid - 1;
+      } else {
+        FILE* ret = gFileList[mid].fhnd;
+        --gFileCount;
+        // Compress the data.
+        if (gFileCount > mid)
+          memmove(gFileList + mid, gFileList + mid + 1, (gFileCount - mid) * sizeof (FILE_LIST));
+        return ret;
+      }
+    }
+    return 0;
+  }
+
+#endif
 
 /* This function only stores unpacked strings. UTF-8 is used for
  * Unicode, and packed strings can only store 7-bit and 8-bit
@@ -521,7 +609,7 @@ static cell AMX_NATIVE_CALL n_fopen(AMX *amx, const cell *params)
 static cell AMX_NATIVE_CALL n_fclose(AMX *amx, const cell *params)
 {
   if (!params[1]) {
-      return 0;
+    return 0;
   }
 
   (void)amx;
