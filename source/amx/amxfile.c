@@ -165,26 +165,26 @@ enum seek_whence {
 
   static cell amxfile_AddPointer(FILE* fhnd)
   {
-    if (gFileCapacity == 0) {
+    if (gFileCapacity==0) {
       /* create the LUT */
-      gFileCapacity = 4;
-      gFileList = (FILE_LIST*)malloc(gFileCapacity * sizeof(FILE_LIST));
-    } else if (gFileCount == gFileCapacity) {
+      gFileCapacity=4;
+      gFileList=(FILE_LIST*)malloc(gFileCapacity*sizeof(FILE_LIST));
+    } else if (gFileCount==gFileCapacity) {
       /* expand the LUT */
-      gFileCapacity *= 2;
-      FILE_LIST* next = (FILE_LIST*)malloc(gFileCapacity * sizeof(FILE_LIST));
-      memmove(next, gFileList, gFileCount * sizeof(FILE_LIST));
+      gFileCapacity*=2;
+      FILE_LIST*next=(FILE_LIST*)malloc(gFileCapacity*sizeof(FILE_LIST));
+      memmove(next,gFileList,gFileCount*sizeof(FILE_LIST));
       free(gFileList);
-      gFileList = next;
+      gFileList=next;
     }
     /* append the data */
     ++gFileNext;
-    if (gFileNext == 0) {
+    if (gFileNext==0) {
       printf("fopen handle overflow");
       return 0;
     }
-    gFileList[gFileCount].fno = gFileNext;
-    gFileList[gFileCount].fhnd = fhnd;
+    gFileList[gFileCount].fno=gFileNext;
+    gFileList[gFileCount].fhnd=fhnd;
     ++gFileCount;
     return (cell)gFileNext;
   }
@@ -192,21 +192,19 @@ enum seek_whence {
   static FILE* amxfile_GetPointer(ucell fno)
   {
     /* binary search */
-    size_t first = 0;
-    size_t last = gFileCount - 1;
-    size_t mid = 0;
-    
-    while (first <= last) {
-      mid = (first + last) / 2;
-      
-      cell diff = gFileList[mid].fno - fno;
-      if (diff < 0) {
-        first = mid + 1;
-      } else if (diff > 0) {
-        last = mid - 1;
-      } else {
+    size_t first=0;
+    size_t last=gFileCount-1;
+    size_t mid=0;
+    cell diff;
+    while (first<=last) {
+      mid=(first+last)/2;
+      diff=gFileList[mid].fno-fno;
+      if (diff<0)
+        first=mid+1;
+      else if (diff>0)
+        last=mid-1;
+      else
         return gFileList[mid].fhnd;
-      }
     }
     return 0;
   }
@@ -214,24 +212,23 @@ enum seek_whence {
   static FILE* amxfile_RemovePointer(ucell fno)
   {
     /* binary search */
-    size_t first = 0;
-    size_t last = gFileCount - 1;
-    size_t mid = 0;
-    
-    while (first <= last) {
-      mid = (first + last) / 2;
-      
-      cell diff = gFileList[mid].fno - fno;
-      if (diff < 0) {
-        first = mid + 1;
-      } else if (diff > 0) {
-        last = mid - 1;
-      } else {
-        FILE* ret = gFileList[mid].fhnd;
+    size_t first=0;
+    size_t last=gFileCount-1;
+    size_t mid=0;
+    cell diff;
+    while (first<=last) {
+      mid=(first+last)/2;
+      diff=gFileList[mid].fno-fno;
+      if (diff<0)
+        first=mid+1;
+      else if (diff>0)
+        last=mid-1;
+      else {
+        FILE*ret=gFileList[mid].fhnd;
         --gFileCount;
         // Compress the data.
-        if (gFileCount > mid)
-          memmove(gFileList + mid, gFileList + mid + 1, (gFileCount - mid) * sizeof (FILE_LIST));
+        if (gFileCount>mid)
+          memmove(gFileList+mid,gFileList+mid+1,(gFileCount-mid)*sizeof(FILE_LIST));
         return ret;
       }
     }
