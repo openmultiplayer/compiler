@@ -149,6 +149,14 @@ enum seek_whence {
   seek_end,
 };
 
+#if PAWN_CELL_SIZE == 16
+  #define FILE_WRITEABLE_BIT (0x8000)
+#elif PAWN_CELL_SIZE == 32
+  #define FILE_WRITEABLE_BIT (0x80000000ul)
+#else
+  #define FILE_WRITEABLE_BIT (0x8000000000000000ull)
+#endif
+
 #if defined AMX_WIDE_POINTERS || defined AMX_FILENO_CHECKS
   /* can't return file pointers as a cell, use a table instead */
   /* or might want the lookup anyway to check for double-closes */
@@ -163,7 +171,7 @@ enum seek_whence {
   static size_t gFileCapacity = 0;
   static ucell gFileNext = 0;
 
-  static cell amxfile_AddPointer(FILE* fhnd)
+  static cell amxfile_AddPointer(FILE* fhnd, cell mode)
   {
     if (gFileCapacity==0) {
       /* create the LUT */
@@ -179,18 +187,19 @@ enum seek_whence {
     }
     /* append the data */
     ++gFileNext;
-    if (gFileNext==0) {
+    if (gFileNext==FILE_WRITEABLE_BIT) {
       printf("fopen handle overflow");
       return 0;
     }
     gFileList[gFileCount].fno=gFileNext;
     gFileList[gFileCount].fhnd=fhnd;
     ++gFileCount;
-    return (cell)gFileNext;
+    return (cell)gFileNext|mode;
   }
 
   static FILE* amxfile_GetPointer(ucell fno)
   {
+    fno&=~FILE_WRITEABLE_BIT;
     /* binary search */
     size_t first=0;
     size_t last=gFileCount-1;
@@ -211,6 +220,7 @@ enum seek_whence {
 
   static FILE* amxfile_RemovePointer(ucell fno)
   {
+    fno&=~FILE_WRITEABLE_BIT;
     /* binary search */
     size_t first=0;
     size_t last=gFileCount-1;
@@ -235,13 +245,13 @@ enum seek_whence {
     return 0;
   }
 
-  #define FILE_ADD_POINTER(f) amxfile_AddPointer(f)
+  #define FILE_ADD_POINTER(f,m) amxfile_AddPointer(f,m)
   #define FILE_GET_POINTER(f) amxfile_GetPointer((ucell)f)
   #define FILE_REMOVE_POINTER(f) amxfile_RemovePointer((ucell)f)
 #else
-  #define FILE_ADD_POINTER(f) ((cell)f)
-  #define FILE_GET_POINTER(f) ((FILE*)f)
-  #define FILE_REMOVE_POINTER(f) ((FILE*)f)
+  #define FILE_ADD_POINTER(f,m) ((cell)f|m)
+  #define FILE_GET_POINTER(f) ((FILE*)(f&~FILE_WRITEABLE_BIT))
+  #define FILE_REMOVE_POINTER(f) ((FILE*)(f&~FILE_WRITEABLE_BIT))
 #endif
 
 /* This function only stores unpacked strings. UTF-8 is used for
@@ -580,6 +590,7 @@ static cell AMX_NATIVE_CALL n_fopen(AMX *amx, const cell *params)
   TCHAR *attrib,*altattrib;
   TCHAR *name,fullname[_MAX_PATH];
   FILE *f = NULL;
+  cell mode=0;
 
   (void)amx;
   altattrib=NULL;
@@ -589,13 +600,16 @@ static cell AMX_NATIVE_CALL n_fopen(AMX *amx, const cell *params)
     break;
   case io_write:
     attrib=__T("wb");
+    mode=FILE_WRITEABLE_BIT;
     break;
   case io_readwrite:
     attrib=__T("r+b");
     altattrib=__T("w+b");
+    mode=FILE_WRITEABLE_BIT;
     break;
   case io_append:
     attrib=__T("ab");
+    mode=FILE_WRITEABLE_BIT;
     break;
   default:
     return 0;
@@ -608,7 +622,7 @@ static cell AMX_NATIVE_CALL n_fopen(AMX *amx, const cell *params)
     if (f==NULL && altattrib!=NULL)
       f=_tfopen(fullname,altattrib);
   } /* if */
-  return FILE_ADD_POINTER(f);
+  return FILE_ADD_POINTER(f, mode);
 }
 
 /* fclose(File: handle) */
@@ -627,6 +641,9 @@ static cell AMX_NATIVE_CALL n_fwrite(AMX *amx, const cell *params)
 {
   FILE* f = FILE_GET_POINTER(params[1]);
   if (!f) {
+    return 0;
+  }
+  if (!(params[1]&FILE_WRITEABLE_BIT)) {
     return 0;
   }
 
@@ -701,6 +718,9 @@ static cell AMX_NATIVE_CALL n_fputchar(AMX *amx, const cell *params)
   if (!f) {
     return 0;
   }
+  if (!(params[1]&FILE_WRITEABLE_BIT)) {
+    return 0;
+  }
 
   size_t result;
 
@@ -762,6 +782,9 @@ static cell AMX_NATIVE_CALL n_fblockwrite(AMX *amx, const cell *params)
   if (!f) {
     return 0;
   }
+  if (!(params[1]&FILE_WRITEABLE_BIT)) {
+    return 0;
+  }
 
   cell *cptr;
   cell count=0;
@@ -810,7 +833,7 @@ static cell AMX_NATIVE_CALL n_ftemp(AMX *amx, const cell *params)
 {
   (void)amx;
   (void)params;
-  return FILE_ADD_POINTER(tmpfile());
+  return FILE_ADD_POINTER(tmpfile(), FILE_WRITEABLE_BIT);
 }
 
 /* fseek(File: handle, position, seek_whence: whence=seek_start) */
@@ -945,12 +968,15 @@ static cell AMX_NATIVE_CALL n_flength(AMX *amx, const cell *params)
   }
 
   long l,c;
-  fflush(f);
   int fn = fileno(f);
+  if (params[1]&FILE_WRITEABLE_BIT) {
+    /* writable, flush */
+    fflush(f);
 #if defined __WIN32__
-  _commit(fn);
+    _commit(fn);
 #endif
-  c=lseek(fn,0,SEEK_CUR); /* save the current position */
+  }
+  c=lseek(fn,0,SEEK_CUR); 
   l=lseek(fn,0,SEEK_END); /* return the file position at its end */
   fseek(f,c,SEEK_SET);   /* restore the file pointer */
   (void)amx;
