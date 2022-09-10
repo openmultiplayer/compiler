@@ -300,17 +300,15 @@ typedef struct tagFUNCSTUBNT {
   uint32_t nameofs      PACKED;
 } AMX_FUNCSTUBNT;
 
+/* used when we don't yet know if this is AMX_FUNCSTUB or AMX_FUNCSTUBNT */
 typedef struct tagFUNCPART {
   ucell address         PACKED;
 } AMX_FUNCPART;
 
+/* used when the pointer may clobber the name too */
 typedef struct tagFUNCWIDE {
-  AMX_NATIVE address    PACKED;
+  uintptr_t address     PACKED;
 } AMX_FUNCWIDE;
-
-typedef struct tagLIBWIDE {
-  uintptr_t address    PACKED;
-} AMX_LIBWIDE;
 
 /* The AMX structure is the internal structure for many functions. Not all
  * fields are valid at all times; many fields are cached in local variables.

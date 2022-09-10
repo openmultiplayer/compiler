@@ -886,7 +886,7 @@ int AMXAPI amx_Init(AMX *amx,void *program)
       #endif
     #endif
     int numlibraries,i;
-    AMX_LIBWIDE* lib;
+    AMX_FUNCWIDE* lib;
     AMX_ENTRY libinit;
   #endif
 
@@ -1047,7 +1047,7 @@ int AMXAPI amx_Init(AMX *amx,void *program)
     hdr=(AMX_HEADER *)amx->base;
     numlibraries=NUMENTRIES(hdr,libraries,pubvars);
     for (i=0; i<numlibraries; i++) {
-      lib = (AMX_LIBWIDE*)GETENTRY(hdr, libraries, i);
+      lib=(AMX_FUNCWIDE*)GETENTRY(hdr, libraries, i);
       libname[0]='\0';
       #if defined LINUX || defined __FreeBSD__ || defined __OpenBSD__
         if (root!=NULL && *root!='\0') {
@@ -1198,17 +1198,17 @@ int AMXAPI amx_Cleanup(AMX *amx)
     #endif
     AMX_HEADER *hdr;
     int numlibraries,i;
-    AMX_LIBWIDE* lib;
+    AMX_FUNCWIDE* lib;
     AMX_ENTRY libcleanup;
   #endif
 
   /* unload all extension modules */
   #if (defined _Windows || defined LINUX || defined __FreeBSD__ || defined __OpenBSD__) && !defined AMX_NODYNALOAD
-    hdr=(AMX_HEADER *)amx->base;
+    hdr=(AMX_HEADER*)amx->base;
     assert(hdr->magic==AMX_MAGIC);
     numlibraries=NUMENTRIES(hdr,libraries,pubvars);
     for (i=0; i<numlibraries; i++) {
-      lib=(AMX_LIBWIDE*)GETENTRY(hdr,libraries,i);
+      lib=(AMX_FUNCWIDE*)GETENTRY(hdr,libraries,i);
       if (lib->address!=0) {
         char funcname[sNAMEMAX+12]; /* +1 for '\0', +4 for 'amx_', +7 for 'Cleanup' */
         strcpy(funcname,"amx_");
@@ -1653,7 +1653,7 @@ int AMXAPI amx_Register(AMX *amx, const AMX_NATIVE_INFO *list, int number)
       /* this function is not yet located */
       funcptr=(list!=NULL) ? findfunction(GETENTRYNAME(hdr,func),list,number) : NULL;
       if (funcptr!=NULL)
-        ((AMX_FUNCWIDE *)func)->address=funcptr;
+        ((AMX_FUNCWIDE *)func)->address=(uintptr_t)funcptr;
       else
         err=AMX_ERR_NOTFOUND;
     } /* if */
