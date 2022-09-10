@@ -3893,11 +3893,21 @@ int AMXAPI amx_Exec(AMX *amx, cell *retval, int index)
 
       cptr=JUMPABS(code,cip)+1; /* +1, to skip the "casetbl" opcode */
       cip=JUMPABS(code,cptr+1); /* preset to "none-matched" case */
-      num=(int)*cptr;           /* number of records in the case table */
-      for (cptr+=2; num>0 && *cptr!=pri; num--,cptr+=2)
-        /* nothing */;
-      if (num>0)
-        cip=JUMPABS(code,cptr+1); /* case found */
+      num=((int)*cptr)-1;       /* number of records in the case table */
+      i=0;
+      while(i<=num){
+        /* /2*2 to truncate */
+        offs=(i+num)/2;
+        val=*(cptr+offs*2)-pri;
+        if (val<0) {
+          i=offs+1;
+        } else if (val>0) {
+          num=offs-1;
+        } else {
+          cip=JUMPABS(code,cptr+offs*2+1); /* case found */
+          break;
+        }
+      }
       break;
     } /* case */
     case OP_SWAP_PRI:
