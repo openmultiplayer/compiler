@@ -149,47 +149,49 @@ enum seek_whence {
   seek_end,
 };
 
-#if defined AMX_WIDE_POINTERS
+#if defined AMX_WIDE_POINTERS || defined AMX_FILENO_CHECKS
   /* can't return file pointers as a cell, use a table instead */
+  /* or might want the lookup anyway to check for double-closes */
   typedef struct tagFILE_LIST {
-    cell fno;
+    ucell fno;
     FILE* fhnd;
   } FILE_LIST;
 
+  /* we can't use file descriptors because they don't preserve the open mode */
   static FILE_LIST* gFileList = 0;
   static size_t gFileCount = 0;
   static size_t gFileCapacity = 0;
-  static cell gFileNext = 0;
+  static ucell gFileNext = 0;
 
   static cell amxfile_AddPointer(FILE* fhnd)
   {
     if (gFileCapacity == 0) {
-      // Create the LUT.
+      /* create the LUT */
       gFileCapacity = 4;
       gFileList = (FILE_LIST*)malloc(gFileCapacity * sizeof(FILE_LIST));
     } else if (gFileCount == gFileCapacity) {
-      // Expand the LUT.
+      /* expand the LUT */
       gFileCapacity *= 2;
       FILE_LIST* next = (FILE_LIST*)malloc(gFileCapacity * sizeof(FILE_LIST));
       memmove(next, gFileList, gFileCount * sizeof(FILE_LIST));
       free(gFileList);
       gFileList = next;
     }
-    // Append the data.
+    /* append the data */
     ++gFileNext;
-    if (gFileNext < 0) {
+    if (gFileNext == 0) {
       printf("fopen handle overflow");
       return 0;
     }
     gFileList[gFileCount].fno = gFileNext;
     gFileList[gFileCount].fhnd = fhnd;
     ++gFileCount;
-    return gFileNext;
+    return (cell)gFileNext;
   }
 
-  static FILE* amxfile_GetPointer(cell fno)
+  static FILE* amxfile_GetPointer(ucell fno)
   {
-    // Binary search
+    /* binary search */
     size_t first = 0;
     size_t last = gFileCount - 1;
     size_t mid = 0;
@@ -209,9 +211,9 @@ enum seek_whence {
     return 0;
   }
 
-  static FILE* amxfile_RemovePointer(cell fno)
+  static FILE* amxfile_RemovePointer(ucell fno)
   {
-    // Binary search
+    /* binary search */
     size_t first = 0;
     size_t last = gFileCount - 1;
     size_t mid = 0;
@@ -236,6 +238,13 @@ enum seek_whence {
     return 0;
   }
 
+  #define FILE_ADD_POINTER(f) amxfile_AddPointer(f)
+  #define FILE_GET_POINTER(f) amxfile_GetPointer((ucell)f)
+  #define FILE_REMOVE_POINTER(f) amxfile_RemovePointer((ucell)f)
+#else
+  #define FILE_ADD_POINTER(f) ((cell)f)
+  #define FILE_GET_POINTER(f) ((FILE*)f)
+  #define FILE_REMOVE_POINTER(f) ((FILE*)f)
 #endif
 
 /* This function only stores unpacked strings. UTF-8 is used for
@@ -602,25 +611,26 @@ static cell AMX_NATIVE_CALL n_fopen(AMX *amx, const cell *params)
     if (f==NULL && altattrib!=NULL)
       f=_tfopen(fullname,altattrib);
   } /* if */
-  return (cell)f;
+  return FILE_ADD_POINTER(f);
 }
 
 /* fclose(File: handle) */
 static cell AMX_NATIVE_CALL n_fclose(AMX *amx, const cell *params)
 {
-  if (!params[1]) {
+  FILE* f = FILE_REMOVE_POINTER(params[1]);
+  if (!f) {
     return 0;
   }
-
   (void)amx;
-  return fclose((FILE*)params[1]) == 0;
+  return fclose(f) == 0;
 }
 
 /* fwrite(File: handle, const string[]) */
 static cell AMX_NATIVE_CALL n_fwrite(AMX *amx, const cell *params)
 {
-  if (!params[1]) {
-      return 0;
+  FILE* f = FILE_GET_POINTER(params[1]);
+  if (!f) {
+    return 0;
   }
 
   size_t r = 0;
@@ -638,11 +648,11 @@ static cell AMX_NATIVE_CALL n_fwrite(AMX *amx, const cell *params)
     /* the string is packed, write it as an ASCII/ANSI string */
     if ((str=(char*)alloca(len + 1))!=NULL) {
       amx_GetString(str,cptr,0,len);
-      r=fputs(str,(FILE*)params[1]);
+      r=fputs(str,f);
     } /* if */
   } else {
     /* the string is unpacked, write it as UTF-8 */
-    r=fputs_cell((FILE*)params[1],cptr,1);
+    r=fputs_cell(f,cptr,1);
   } /* if */
   return (cell)r;
 }
@@ -650,8 +660,9 @@ static cell AMX_NATIVE_CALL n_fwrite(AMX *amx, const cell *params)
 /* fread(File: handle, string[], size=sizeof string, bool:pack=false) */
 static cell AMX_NATIVE_CALL n_fread(AMX *amx, const cell *params)
 {
-  if (!params[1]) {
-      return 0;
+  FILE* f = FILE_GET_POINTER(params[1]);
+  if (!f) {
+    return 0;
   }
 
   size_t chars;
@@ -674,12 +685,12 @@ static cell AMX_NATIVE_CALL n_fread(AMX *amx, const cell *params)
 
   if (params[4]) {
     /* store as packed string, read an ASCII/ANSI string */
-    chars=fgets_char((FILE*)params[1],str,max);
+    chars=fgets_char(f,str,max);
     assert((int)chars<max);
     amx_SetString(cptr,str,1,0,max);
   } else {
     /* store and unpacked string, interpret UTF-8 */
-    chars=fgets_cell((FILE*)params[1],cptr,max,1);
+    chars=fgets_cell(f,cptr,max,1);
   } /* if */
 
   assert((int)chars<max);
@@ -689,8 +700,9 @@ static cell AMX_NATIVE_CALL n_fread(AMX *amx, const cell *params)
 /* fputchar(File: handle, value, bool:utf8 = true) */
 static cell AMX_NATIVE_CALL n_fputchar(AMX *amx, const cell *params)
 {
-  if (!params[1]) {
-      return 0;
+  FILE* f = FILE_GET_POINTER(params[1]);
+  if (!f) {
+    return 0;
   }
 
   size_t result;
@@ -700,9 +712,9 @@ static cell AMX_NATIVE_CALL n_fputchar(AMX *amx, const cell *params)
     cell str[2];
     str[0]=params[2];
     str[1]=0;
-    result=fputs_cell((FILE*)params[1],str,1);
+    result=fputs_cell(f,str,1);
   } else {
-    fputc((int)params[2],(FILE*)params[1]);
+    fputc((int)params[2],f);
 	result=1;
   } /* if */
   assert(result==0 || result==1);
@@ -712,8 +724,9 @@ static cell AMX_NATIVE_CALL n_fputchar(AMX *amx, const cell *params)
 /* fgetchar(File: handle, bool:utf8 = true) */
 static cell AMX_NATIVE_CALL n_fgetchar(AMX *amx, const cell *params)
 {
-  if (!params[1]) {
-      return 0;
+  FILE* f = FILE_GET_POINTER(params[1]);
+  if (!f) {
+    return 0;
   }
 
   cell str[2];
@@ -723,9 +736,9 @@ static cell AMX_NATIVE_CALL n_fgetchar(AMX *amx, const cell *params)
   /* old declarations were incorrectly: fgetchar(File:handle, value, bool:utf8 = true) */
   /* this handles both versions by trying to work out which is used */
   if (params[0] == 12 ? params[3] : params[2]) {
-    result=fgets_cell((FILE*)params[1],str,2,1);
+    result=fgets_cell(f,str,2,1);
   } else {
-    str[0]=fgetc((FILE*)params[1]);
+    str[0]=fgetc(f);
     result= (str[0]!=EOF);
   } /* if */
   assert(result==0 || result==1);
@@ -748,8 +761,9 @@ static cell AMX_NATIVE_CALL n_fgetchar(AMX *amx, const cell *params)
 /* fblockwrite(File: handle, buffer[], size=sizeof buffer) */
 static cell AMX_NATIVE_CALL n_fblockwrite(AMX *amx, const cell *params)
 {
-  if (!params[1]) {
-      return 0;
+  FILE* f = FILE_GET_POINTER(params[1]);
+  if (!f) {
+    return 0;
   }
 
   cell *cptr;
@@ -762,7 +776,7 @@ static cell AMX_NATIVE_CALL n_fblockwrite(AMX *amx, const cell *params)
     ucell v;
     for (count=0; count<max; count++) {
       v=(ucell)*cptr++;
-      if (fwrite(aligncell(&v),sizeof(cell),1,(FILE*)params[1])!=1)
+      if (fwrite(aligncell(&v),sizeof(cell),1,f)!=1)
         break;          /* write error */
     } /* for */
   } /* if */
@@ -772,8 +786,9 @@ static cell AMX_NATIVE_CALL n_fblockwrite(AMX *amx, const cell *params)
 /* fblockread(File: handle, buffer[], size=sizeof buffer) */
 static cell AMX_NATIVE_CALL n_fblockread(AMX *amx, const cell *params)
 {
-  if (!params[1]) {
-      return 0;
+  FILE* f = FILE_GET_POINTER(params[1]);
+  if (!f) {
+    return 0;
   }
 
   cell *cptr;
@@ -785,7 +800,7 @@ static cell AMX_NATIVE_CALL n_fblockread(AMX *amx, const cell *params)
     cell max=params[3];
     ucell v;
     for (count=0; count<max; count++) {
-      if (fread(&v,sizeof(cell),1,(FILE*)params[1])!=1)
+      if (fread(&v,sizeof(cell),1,f)!=1)
         break;          /* write error */
       *cptr++=(cell)*aligncell(&v);
     } /* for */
@@ -798,14 +813,15 @@ static cell AMX_NATIVE_CALL n_ftemp(AMX *amx, const cell *params)
 {
   (void)amx;
   (void)params;
-  return (cell)tmpfile();
+  return FILE_ADD_POINTER(tmpfile());
 }
 
 /* fseek(File: handle, position, seek_whence: whence=seek_start) */
 static cell AMX_NATIVE_CALL n_fseek(AMX *amx, const cell *params)
 {
-  if (!params[1]) {
-      return 0;
+  FILE* f = FILE_GET_POINTER(params[1]);
+  if (!f) {
+    return 0;
   }
 
   int whence;
@@ -825,16 +841,17 @@ static cell AMX_NATIVE_CALL n_fseek(AMX *amx, const cell *params)
   default:
     return 0;
   } /* switch */
-  return fseek((FILE *)params[1],params[2],whence);
+  return fseek(f,params[2],whence);
 }
 
 /* ftell(File: handle) */
 static cell AMX_NATIVE_CALL n_ftell(AMX *amx, const cell *params)
 {
-  if (!params[1]) {
-      return 0;
+  FILE* f = FILE_GET_POINTER(params[1]);
+  if (!f) {
+    return 0;
   }
-  return (cell)ftell((FILE *)params[1]);
+  return (cell)ftell(f);
 }
 
 /* ftouch(const name[]) */
@@ -925,20 +942,20 @@ static cell AMX_NATIVE_CALL n_frename(AMX *amx, const cell *params)
 /* flength(File: handle) */
 static cell AMX_NATIVE_CALL n_flength(AMX *amx, const cell *params)
 {
-  if (!params[1]) {
-      return 0;
+  FILE* f = FILE_GET_POINTER(params[1]);
+  if (!f) {
+    return 0;
   }
 
   long l,c;
-  FILE* fhnd = (FILE*)params[1];
-  fflush(fhnd);
-  int fn = fileno(fhnd);
+  fflush(f);
+  int fn = fileno(f);
 #if defined __WIN32__
   _commit(fn);
 #endif
   c=lseek(fn,0,SEEK_CUR); /* save the current position */
   l=lseek(fn,0,SEEK_END); /* return the file position at its end */
-  fseek((FILE *)params[1],c,SEEK_SET);   /* restore the file pointer */
+  fseek(f,c,SEEK_SET);   /* restore the file pointer */
   (void)amx;
   return l;
 }
