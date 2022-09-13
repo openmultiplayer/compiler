@@ -970,7 +970,7 @@ int AMXAPI amx_Init(AMX *amx,void *program)
    */
   if (amx->data!=NULL) {
     data=amx->data;
-    memcpy(data,amx->base+(int)hdr->dat,(size_t)(hdr->hea-hdr->dat));
+    memcpy(data,amx->base+(uintptr_t)hdr->dat,(size_t)(hdr->hea-hdr->dat));
   } else {
     data=amx->base+(int)hdr->dat;
   } /* if */
@@ -1761,17 +1761,17 @@ int AMXAPI amx_PushString(AMX *amx, cell *amx_addr, cell **phys_addr, const char
  */
 #if !defined _R
   #define _R_DEFAULT            /* mark default memory access */
-  #define _R(base,addr)         (* (cell *)((unsigned char*)(base)+(int)(addr)))
-  #define _R8(base,addr)        (* (unsigned char *)((unsigned char*)(base)+(int)(addr)))
-  #define _R16(base,addr)       (* (uint16_t *)((unsigned char*)(base)+(int)(addr)))
-  #define _R32(base,addr)       (* (uint32_t *)((unsigned char*)(base)+(int)(addr)))
+  #define _R(base,addr)         (* (cell *)((unsigned char*)(base)+(uintptr_t)(addr)))
+  #define _R8(base,addr)        (* (unsigned char *)((unsigned char*)(base)+(uintptr_t)(addr)))
+  #define _R16(base,addr)       (* (uint16_t *)((unsigned char*)(base)+(uintptr_t)(addr)))
+  #define _R32(base,addr)       (* (uint32_t *)((unsigned char*)(base)+(uintptr_t)(addr)))
 #endif
 #if !defined _W
   #define _W_DEFAULT            /* mark default memory access */
-  #define _W(base,addr,value)   ((*(cell *)((unsigned char*)(base)+(int)(addr)))=(cell)(value))
-  #define _W8(base,addr,value)  ((*(unsigned char *)((unsigned char*)(base)+(int)(addr)))=(unsigned char)(value))
-  #define _W16(base,addr,value) ((*(uint16_t *)((unsigned char*)(base)+(int)(addr)))=(uint16_t)(value))
-  #define _W32(base,addr,value) ((*(uint32_t *)((unsigned char*)(base)+(int)(addr)))=(uint32_t)(value))
+  #define _W(base,addr,value)   ((*(cell *)((unsigned char*)(base)+(uintptr_t)(addr)))=(cell)(value))
+  #define _W8(base,addr,value)  ((*(unsigned char *)((unsigned char*)(base)+(uintptr_t)(addr)))=(unsigned char)(value))
+  #define _W16(base,addr,value) ((*(uint16_t *)((unsigned char*)(base)+(uintptr_t)(addr)))=(uint16_t)(value))
+  #define _W32(base,addr,value) ((*(uint32_t *)((unsigned char*)(base)+(uintptr_t)(addr)))=(uint32_t)(value))
 #endif
 
 #if -8/3==-2 && 8/-3==-2
@@ -2607,7 +2607,7 @@ static const void * const amx_opcodelist[] = {
     if (((alt+offs)>hea && (alt+offs)<stk) || (ucell)(alt+offs)>(ucell)amx->stp)
       ABORT(amx,AMX_ERR_MEMACCESS);
     #if defined _R_DEFAULT
-      memcpy(data+(int)alt, data+(int)pri, (int)offs);
+      memcpy(data+(uintptr_t)alt, data+(uintptr_t)pri, (int)offs);
     #else
       for (i=0; i+4<offs; i+=4) {
         val=_R32(data,pri+i);
@@ -2783,7 +2783,7 @@ static const void * const amx_opcodelist[] = {
     amx->frm=frm;
     amx->stk=stk;
     num=amx->callback(amx,offs,&pri,(cell *)(data+(int)stk));
-    stk+=val+4;
+    stk+=val+sizeof(cell);
     if (num!=AMX_ERR_NONE) {
       if (num==AMX_ERR_SLEEP) {
         amx->pri=pri;
@@ -3776,7 +3776,7 @@ int AMXAPI amx_Exec(AMX *amx, cell *retval, int index)
       if (((alt+offs)>hea && (alt+offs)<stk) || (ucell)(alt+offs)>(ucell)amx->stp)
         ABORT(amx,AMX_ERR_MEMACCESS);
       #if defined _R_DEFAULT
-        memcpy(data+(int)alt, data+(int)pri, (int)offs);
+        memcpy(data+(uintptr_t)alt, data+(uintptr_t)pri, (size_t)offs);
       #else
         for (i=0; i+4<offs; i+=4) {
           val=_R32(data,pri+i);
@@ -3947,7 +3947,7 @@ int AMXAPI amx_Exec(AMX *amx, cell *retval, int index)
       amx->frm=frm;
       amx->stk=stk;
       num=amx->callback(amx,offs,&pri,(cell *)(data+(int)stk));
-      stk+=val+4;
+      stk+=val+sizeof(cell);
       if (num!=AMX_ERR_NONE) {
         if (num==AMX_ERR_SLEEP) {
           amx->pri=pri;

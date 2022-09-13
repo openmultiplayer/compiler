@@ -434,7 +434,11 @@ static cell AMX_NATIVE_CALL core_random(AMX *amx,const cell *params)
     unsigned long lo, hi, ll, lh, hh, hl;
     unsigned long result;
     char invert = params[1] < 0 ? 1 : 0;
-    cell value = abs(params[1]);
+    #if defined __64BIT__
+        cell value = llabs(params[1]);
+    #else
+        cell value = abs(params[1]);
+    #endif
 
     /* one-time initialization (or, mostly one-time) */
     #if !defined SN_TARGET_PS2 && !defined _WIN32_WCE && !defined __ICC430__
