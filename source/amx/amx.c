@@ -490,11 +490,11 @@ int AMXAPI amx_Callback(AMX *amx, cell index, cell *result, const cell *params)
   #define RELOC_VALUE(base, v)
 #else
   #define JUMPABS(base, ip)     ((cell *)*(ip))
-  #define RELOC_ABS(base, off)  (*(ucell *)((base)+(int)(off)) += (ucell)(base))
+  #define RELOC_ABS(base, off)  (*(ucell *)((base)+(uintptr_t)(off)) += (ucell)(base))
   #define RELOC_VALUE(base, v)  ((v)+((ucell)(base)))
 #endif
 
-#define DBGPARAM(v)     ( (v)=*(cell *)(code+(int)cip), cip+=sizeof(cell) )
+#define DBGPARAM(v)     ( (v)=*(cell *)(code+(uintptr_t)cip), cip+=sizeof(cell) )
 
 #if defined AMX_INIT
 
@@ -518,7 +518,7 @@ static int amx_BrowseRelocate(AMX *amx)
   hdr=(AMX_HEADER *)amx->base;
   assert(hdr!=NULL);
   assert(hdr->magic==AMX_MAGIC);
-  code=amx->base+(int)hdr->cod;
+  code=amx->base+(uintptr_t)hdr->cod;
   codesize=hdr->dat - hdr->cod;
   amx->flags|=AMX_FLAG_BROWSE;
 
@@ -540,7 +540,7 @@ static int amx_BrowseRelocate(AMX *amx)
 
   /* start browsing code */
   for (cip=0; cip<codesize; ) {
-    op=(OPCODE) *(ucell *)(code+(int)cip);
+    op=(OPCODE) *(ucell *)(code+(uintptr_t)cip);
     if ((unsigned)op>=OP_NUM_OPCODES) {
       amx->flags &= ~AMX_FLAG_BROWSE;
       return AMX_ERR_INVINSTR;
@@ -550,7 +550,7 @@ static int amx_BrowseRelocate(AMX *amx)
        * as big as the size of a pointer (jump address); so basically we
        * rely on the opcode and a pointer being 32-bit
        */
-      *(cell *)(code+(int)cip) = opcode_list[op];
+      *(cell *)(code+(uintptr_t)cip) = opcode_list[op];
     #endif
     #if defined JIT
       opcode_count++;
@@ -845,7 +845,7 @@ static void expand(unsigned char *code, long codesize, long memsize)
     } /* if */
     /* store */
     while (sc && (spare[sh].memloc>codesize)) {
-      *(ucell *)(code+(int)spare[sh].memloc)=spare[sh].c;
+      *(ucell *)(code+(uintptr_t)spare[sh].memloc)=spare[sh].c;
       sh=(sh+1)%AMX_COMPACTMARGIN;
       sc--;
     } /* while */
@@ -939,15 +939,15 @@ int AMXAPI amx_Init(AMX *amx,void *program)
     return AMX_ERR_FORMAT;
   #if BYTE_ORDER==BIG_ENDIAN
     if ((hdr->flags & AMX_FLAG_COMPACT)==0) {
-      ucell *code=(ucell *)((unsigned char *)program+(int)hdr->cod);
-      while (code<(ucell *)((unsigned char *)program+(int)hdr->hea))
+      ucell *code=(ucell *)((unsigned char *)program+(uintptr_t)hdr->cod);
+      while (code<(ucell *)((unsigned char *)program+(uintptr_t)hdr->hea))
         swapcell(code++);
     } /* if */
   #endif
   assert((hdr->flags & AMX_FLAG_COMPACT)!=0 || hdr->hea == hdr->size);
   if ((hdr->flags & AMX_FLAG_COMPACT)!=0) {
     #if AMX_COMPACTMARGIN > 2
-      expand((unsigned char *)program+(int)hdr->cod,
+      expand((unsigned char *)program+(uintptr_t)hdr->cod,
              hdr->size - hdr->cod, hdr->hea - hdr->cod);
     #else
       return AMX_ERR_FORMAT;
@@ -972,13 +972,13 @@ int AMXAPI amx_Init(AMX *amx,void *program)
     data=amx->data;
     memcpy(data,amx->base+(uintptr_t)hdr->dat,(size_t)(hdr->hea-hdr->dat));
   } else {
-    data=amx->base+(int)hdr->dat;
+    data=amx->base+(uintptr_t)hdr->dat;
   } /* if */
 
   /* Set a zero cell at the top of the stack, which functions
    * as a sentinel for strings.
    */
-  * (cell *)(data+(int)(hdr->stp-hdr->dat-sizeof(cell)))=0;
+  * (cell *)(data+(uintptr_t)(hdr->stp-hdr->dat-sizeof(cell)))=0;
 
   /* also align all addresses in the public function, public variable,
    * public tag and native function tables --offsets into the name table
@@ -1271,13 +1271,13 @@ int AMXAPI amx_Clone(AMX *amxClone, AMX *amxSource, void *data)
   /* copy the data segment; the stack and the heap can be left uninitialized */
   assert(data!=NULL);
   amxClone->data=(unsigned char _FAR *)data;
-  dataSource=(amxSource->data!=NULL) ? amxSource->data : amxSource->base+(int)hdr->dat;
+  dataSource=(amxSource->data!=NULL) ? amxSource->data : amxSource->base+(uintptr_t)hdr->dat;
   memcpy(amxClone->data,dataSource,(size_t)(hdr->hea-hdr->dat));
 
   /* Set a zero cell at the top of the stack, which functions
    * as a sentinel for strings.
    */
-  * (cell *)(amxClone->data+(int)amxClone->stp) = 0;
+  * (cell *)(amxClone->data+(uintptr_t)amxClone->stp) = 0;
 
   return AMX_ERR_NONE;
 }
@@ -1688,10 +1688,10 @@ int AMXAPI amx_Push(AMX *amx, cell value)
   if (amx->hea+STKMARGIN>amx->stk)
     return AMX_ERR_STACKERR;
   hdr=(AMX_HEADER *)amx->base;
-  data=(amx->data!=NULL) ? amx->data : amx->base+(int)hdr->dat;
+  data=(amx->data!=NULL) ? amx->data : amx->base+(uintptr_t)hdr->dat;
   amx->stk-=sizeof(cell);
   amx->paramcount+=1;
-  *(cell *)(data+(int)amx->stk)=value;
+  *(cell *)(data+(uintptr_t)amx->stk)=value;
   return AMX_ERR_NONE;
 }
 
@@ -1892,8 +1892,8 @@ static const void * const amx_opcodelist[] = {
   hdr=(AMX_HEADER *)amx->base;
   assert(hdr->magic==AMX_MAGIC);
   codesize=(ucell)(hdr->dat-hdr->cod);
-  code=amx->base+(int)hdr->cod;
-  data=(amx->data!=NULL) ? amx->data : amx->base+(int)hdr->dat;
+  code=amx->base+(uintptr_t)hdr->cod;
+  data=(amx->data!=NULL) ? amx->data : amx->base+(uintptr_t)hdr->dat;
   hea=amx->hea;
   stk=amx->stk;
   reset_stk=stk;
@@ -1905,7 +1905,7 @@ static const void * const amx_opcodelist[] = {
   if (index==AMX_EXEC_MAIN) {
     if (hdr->cip<0)
       return AMX_ERR_INDEX;
-    cip=(cell *)(code + (int)hdr->cip);
+    cip=(cell *)(code+(uintptr_t)hdr->cip);
   } else if (index==AMX_EXEC_CONT) {
     /* all registers: pri, alt, frm, cip, hea, stk, reset_stk, reset_hea */
     frm=amx->frm;
@@ -1915,14 +1915,14 @@ static const void * const amx_opcodelist[] = {
     alt=amx->alt;
     reset_stk=amx->reset_stk;
     reset_hea=amx->reset_hea;
-    cip=(cell *)(code + (int)amx->cip);
+    cip=(cell *)(code+(uintptr_t)amx->cip);
   } else if (index<0) {
     return AMX_ERR_INDEX;
   } else {
     if (index>=(int)NUMENTRIES(hdr,publics,natives))
       return AMX_ERR_INDEX;
     func=GETENTRY(hdr,publics,index);
-    cip=(cell *)(code + (int)func->address);
+    cip=(cell *)(code+(uintptr_t)func->address);
   } /* if */
   /* check values just copied */
   CHKSTACK();
@@ -2178,7 +2178,7 @@ static const void * const amx_opcodelist[] = {
       frm=pri;
       break;
     case 6:
-      cip=(cell *)(code + (int)pri);
+      cip=(cell *)(code+(uintptr_t)pri);
       break;
     } /* switch */
     NEXT(cip);
@@ -2247,7 +2247,7 @@ static const void * const amx_opcodelist[] = {
     /* verify the return address */
     if ((ucell)offs>=codesize)
       ABORT(amx,AMX_ERR_MEMACCESS);
-    cip=(cell *)(code+(int)offs);
+    cip=(cell *)(code+(uintptr_t)offs);
     NEXT(cip);
   op_retn:
     POP(frm);
@@ -2255,7 +2255,7 @@ static const void * const amx_opcodelist[] = {
     /* verify the return address */
     if ((ucell)offs>=codesize)
       ABORT(amx,AMX_ERR_MEMACCESS);
-    cip=(cell *)(code+(int)offs);
+    cip=(cell *)(code+(uintptr_t)offs);
     stk+= _R(data,stk) + sizeof(cell);  /* remove parameters from the stack */
     NEXT(cip);
   op_call:
@@ -2264,7 +2264,7 @@ static const void * const amx_opcodelist[] = {
     NEXT(cip);
   op_call_pri:
     PUSH((unsigned char *)cip-code);
-    cip=(cell *)(code+(int)pri);
+    cip=(cell *)(code+(uintptr_t)pri);
     NEXT(cip);
   op_jump:
     /* since the GETPARAM() macro modifies cip, you cannot
@@ -2273,7 +2273,7 @@ static const void * const amx_opcodelist[] = {
     NEXT(cip);
   op_jrel:
     offs=*cip;
-    cip=(cell *)((unsigned char *)cip + (int)offs + sizeof(cell));
+    cip=(cell *)((unsigned char *)cip+(uintptr_t)offs + sizeof(cell));
     NEXT(cip);
   op_jzer:
     if (pri==0)
@@ -2538,7 +2538,7 @@ static const void * const amx_opcodelist[] = {
   op_inc:
     GETPARAM(offs);
     #if defined _R_DEFAULT
-      *(cell *)(data+(int)offs) += 1;
+      *(cell *)(data+(uintptr_t)offs) += 1;
     #else
       val=_R(data,offs);
       _W(data,offs,val+1);
@@ -2547,7 +2547,7 @@ static const void * const amx_opcodelist[] = {
   op_inc_s:
     GETPARAM(offs);
     #if defined _R_DEFAULT
-      *(cell *)(data+(int)(frm+offs)) += 1;
+      *(cell *)(data+(uintptr_t)(frm+offs)) += 1;
     #else
       val=_R(data,frm+offs);
       _W(data,frm+offs,val+1);
@@ -2555,7 +2555,7 @@ static const void * const amx_opcodelist[] = {
     NEXT(cip);
   op_inc_i:
     #if defined _R_DEFAULT
-      *(cell *)(data+(int)pri) += 1;
+      *(cell *)(data+(uintptr_t)pri) += 1;
     #else
       val=_R(data,pri);
       _W(data,pri,val+1);
@@ -2570,7 +2570,7 @@ static const void * const amx_opcodelist[] = {
   op_dec:
     GETPARAM(offs);
     #if defined _R_DEFAULT
-      *(cell *)(data+(int)offs) -= 1;
+      *(cell *)(data+(uintptr_t)offs) -= 1;
     #else
       val=_R(data,offs);
       _W(data,offs,val-1);
@@ -2579,7 +2579,7 @@ static const void * const amx_opcodelist[] = {
   op_dec_s:
     GETPARAM(offs);
     #if defined _R_DEFAULT
-      *(cell *)(data+(int)(frm+offs)) -= 1;
+      *(cell *)(data+(uintptr_t)(frm+offs)) -= 1;
     #else
       val=_R(data,frm+offs);
       _W(data,frm+offs,val-1);
@@ -2587,7 +2587,7 @@ static const void * const amx_opcodelist[] = {
     NEXT(cip);
   op_dec_i:
     #if defined _R_DEFAULT
-      *(cell *)(data+(int)pri) -= 1;
+      *(cell *)(data+(uintptr_t)pri) -= 1;
     #else
       val=_R(data,pri);
       _W(data,pri,val-1);
@@ -2607,11 +2607,11 @@ static const void * const amx_opcodelist[] = {
     if (((alt+offs)>hea && (alt+offs)<stk) || (ucell)(alt+offs)>(ucell)amx->stp)
       ABORT(amx,AMX_ERR_MEMACCESS);
     #if defined _R_DEFAULT
-      memcpy(data+(uintptr_t)alt, data+(uintptr_t)pri, (int)offs);
+      memcpy(data+(uintptr_t)alt, data+(uintptr_t)pri, (size_t)offs);
     #else
-      for (i=0; i+4<offs; i+=4) {
-        val=_R32(data,pri+i);
-        _W32(data,alt+i,val);
+      for (i=0; i+sizeof(cell)<offs; i+=sizeof(cell)) {
+        val=_R(data,pri+i);
+        _W(data,alt+i,val);
       } /* for */
       for ( ; i<offs; i++) {
         val=_R8(data,pri+i);
@@ -2633,11 +2633,11 @@ static const void * const amx_opcodelist[] = {
     if (((alt+offs)>hea && (alt+offs)<stk) || (ucell)(alt+offs)>(ucell)amx->stp)
       ABORT(amx,AMX_ERR_MEMACCESS);
     #if defined _R_DEFAULT
-      pri=memcmp(data+(int)alt, data+(int)pri, (int)offs);
+      pri=memcmp(data+(uintptr_t)alt, data+(uintptr_t)pri, (size_t)offs);
     #else
       pri=0;
-      for (i=0; i+4<offs && pri==0; i+=4)
-        pri=_R32(data,alt+i)-_R32(data,pri+i);
+      for (i=0; i+sizeof(cell)<offs && pri==0; i+=sizeof(cell))
+        pri=_R(data,alt+i)-_R(data,pri+i);
       for ( ; i<offs && pri==0; i++)
         pri=_R8(data,alt+i)-_R8(data,pri+i);
     #endif
@@ -2650,7 +2650,7 @@ static const void * const amx_opcodelist[] = {
     if (((alt+offs)>hea && (alt+offs)<stk) || (ucell)(alt+offs)>(ucell)amx->stp)
       ABORT(amx,AMX_ERR_MEMACCESS);
     for (i=(int)alt; offs>=(int)sizeof(cell); i+=sizeof(cell), offs-=sizeof(cell))
-      _W32(data,i,pri);
+      _W(data,i,pri);
     NEXT(cip);
   op_halt:
     GETPARAM(offs);
@@ -2682,7 +2682,7 @@ static const void * const amx_opcodelist[] = {
     amx->hea=hea;
     amx->frm=frm;
     amx->stk=stk;
-    num=amx->callback(amx,pri,&pri,(cell *)(data+(int)stk));
+    num=amx->callback(amx,pri,&pri,(cell *)(data+(uintptr_t)stk));
     if (num!=AMX_ERR_NONE) {
       if (num==AMX_ERR_SLEEP) {
         amx->pri=pri;
@@ -2701,7 +2701,7 @@ static const void * const amx_opcodelist[] = {
     amx->hea=hea;
     amx->frm=frm;
     amx->stk=stk;
-    num=amx->callback(amx,offs,&pri,(cell *)(data+(int)stk));
+    num=amx->callback(amx,offs,&pri,(cell *)(data+(uintptr_t)stk));
     if (num!=AMX_ERR_NONE) {
       if (num==AMX_ERR_SLEEP) {
         amx->pri=pri;
@@ -2721,7 +2721,7 @@ static const void * const amx_opcodelist[] = {
     NEXT(cip);
   op_symbol:
     GETPARAM(offs);
-    cip=(cell *)((unsigned char *)cip + (int)offs);
+    cip=(cell *)((unsigned char *)cip+(uintptr_t)offs);
     NEXT(cip);
   op_srange:
     SKIPPARAM(2);
@@ -2730,7 +2730,7 @@ static const void * const amx_opcodelist[] = {
     SKIPPARAM(1);
     NEXT(cip);
   op_jump_pri:
-    cip=(cell *)(code+(int)pri);
+    cip=(cell *)(code+(uintptr_t)pri);
     NEXT(cip);
   op_switch: {
     cell *cptr;
@@ -2782,7 +2782,7 @@ static const void * const amx_opcodelist[] = {
     amx->hea=hea;
     amx->frm=frm;
     amx->stk=stk;
-    num=amx->callback(amx,offs,&pri,(cell *)(data+(int)stk));
+    num=amx->callback(amx,offs,&pri,(cell *)(data+(uintptr_t)stk));
     stk+=val+sizeof(cell);
     if (num!=AMX_ERR_NONE) {
       if (num==AMX_ERR_SLEEP) {
@@ -3018,8 +3018,8 @@ int AMXAPI amx_Exec(AMX *amx, cell *retval, int index)
   hdr=(AMX_HEADER *)amx->base;
   assert(hdr->magic==AMX_MAGIC);
   codesize=(ucell)(hdr->dat-hdr->cod);
-  code=amx->base+(int)hdr->cod;
-  data=(amx->data!=NULL) ? amx->data : amx->base+(int)hdr->dat;
+  code=amx->base+(uintptr_t)hdr->cod;
+  data=(amx->data!=NULL) ? amx->data : amx->base+(uintptr_t)hdr->dat;
   hea=amx->hea;
   stk=amx->stk;
   reset_stk=stk;
@@ -3030,7 +3030,7 @@ int AMXAPI amx_Exec(AMX *amx, cell *retval, int index)
   if (index==AMX_EXEC_MAIN) {
     if (hdr->cip<0)
       return AMX_ERR_INDEX;
-    cip=(cell *)(code + (int)hdr->cip);
+    cip=(cell *)(code+(uintptr_t)hdr->cip);
   } else if (index==AMX_EXEC_CONT) {
     /* all registers: pri, alt, frm, cip, hea, stk, reset_stk, reset_hea */
     frm=amx->frm;
@@ -3040,14 +3040,14 @@ int AMXAPI amx_Exec(AMX *amx, cell *retval, int index)
     alt=amx->alt;
     reset_stk=amx->reset_stk;
     reset_hea=amx->reset_hea;
-    cip=(cell *)(code + (int)amx->cip);
+    cip=(cell *)(code+(uintptr_t)amx->cip);
   } else if (index<0) {
     return AMX_ERR_INDEX;
   } else {
     if (index>=(cell)NUMENTRIES(hdr,publics,natives))
       return AMX_ERR_INDEX;
     func=GETENTRY(hdr,publics,index);
-    cip=(cell *)(code + (int)func->address);
+    cip=(cell *)(code+(uintptr_t)func->address);
   } /* if */
   /* check values just copied */
   CHKSTACK();
@@ -3346,7 +3346,7 @@ int AMXAPI amx_Exec(AMX *amx, cell *retval, int index)
         frm=pri;
         break;
       case 6:
-        cip=(cell *)(code + (int)pri);
+        cip=(cell *)(code+(uintptr_t)pri);
         break;
       } /* switch */
       break;
@@ -3415,7 +3415,7 @@ int AMXAPI amx_Exec(AMX *amx, cell *retval, int index)
       /* verify the return address */
       if ((ucell)offs>=codesize)
         ABORT(amx,AMX_ERR_MEMACCESS);
-      cip=(cell *)(code+(int)offs);
+      cip=(cell *)(code+(uintptr_t)offs);
       break;
     case OP_RETN:
       POP(frm);
@@ -3423,7 +3423,7 @@ int AMXAPI amx_Exec(AMX *amx, cell *retval, int index)
       /* verify the return address */
       if ((ucell)offs>=codesize)
         ABORT(amx,AMX_ERR_MEMACCESS);
-      cip=(cell *)(code+(int)offs);
+      cip=(cell *)(code+(uintptr_t)offs);
       stk+=_R(data,stk)+sizeof(cell);   /* remove parameters from the stack */
       amx->stk=stk;
       break;
@@ -3433,7 +3433,7 @@ int AMXAPI amx_Exec(AMX *amx, cell *retval, int index)
       break;
     case OP_CALL_PRI:
       PUSH((unsigned char *)cip-code);
-      cip=(cell *)(code+(int)pri);
+      cip=(cell *)(code+(uintptr_t)pri);
       break;
     case OP_JUMP:
       /* since the GETPARAM() macro modifies cip, you cannot
@@ -3442,7 +3442,7 @@ int AMXAPI amx_Exec(AMX *amx, cell *retval, int index)
       break;
     case OP_JREL:
       offs=*cip;
-      cip=(cell *)((unsigned char *)cip + (int)offs + sizeof(cell));
+      cip=(cell *)((unsigned char *)cip+(uintptr_t)offs + sizeof(cell));
       break;
     case OP_JZER:
       if (pri==0)
@@ -3707,7 +3707,7 @@ int AMXAPI amx_Exec(AMX *amx, cell *retval, int index)
     case OP_INC:
       GETPARAM(offs);
       #if defined _R_DEFAULT
-        *(cell *)(data+(int)offs) += 1;
+        *(cell *)(data+(uintptr_t)offs) += 1;
       #else
         val=_R(data,offs);
         _W(data,offs,val+1);
@@ -3716,7 +3716,7 @@ int AMXAPI amx_Exec(AMX *amx, cell *retval, int index)
     case OP_INC_S:
       GETPARAM(offs);
       #if defined _R_DEFAULT
-        *(cell *)(data+(int)(frm+offs)) += 1;
+        *(cell *)(data+(uintptr_t)(frm+offs)) += 1;
       #else
         val=_R(data,frm+offs);
         _W(data,frm+offs,val+1);
@@ -3724,7 +3724,7 @@ int AMXAPI amx_Exec(AMX *amx, cell *retval, int index)
       break;
     case OP_INC_I:
       #if defined _R_DEFAULT
-        *(cell *)(data+(int)pri) += 1;
+        *(cell *)(data+(uintptr_t)pri) += 1;
       #else
         val=_R(data,pri);
         _W(data,pri,val+1);
@@ -3739,7 +3739,7 @@ int AMXAPI amx_Exec(AMX *amx, cell *retval, int index)
     case OP_DEC:
       GETPARAM(offs);
       #if defined _R_DEFAULT
-        *(cell *)(data+(int)offs) -= 1;
+        *(cell *)(data+(uintptr_t)offs) -= 1;
       #else
         val=_R(data,offs);
         _W(data,offs,val-1);
@@ -3748,7 +3748,7 @@ int AMXAPI amx_Exec(AMX *amx, cell *retval, int index)
     case OP_DEC_S:
       GETPARAM(offs);
       #if defined _R_DEFAULT
-        *(cell *)(data+(int)(frm+offs)) -= 1;
+        *(cell *)(data+(uintptr_t)(frm+offs)) -= 1;
       #else
         val=_R(data,frm+offs);
         _W(data,frm+offs,val-1);
@@ -3756,7 +3756,7 @@ int AMXAPI amx_Exec(AMX *amx, cell *retval, int index)
       break;
     case OP_DEC_I:
       #if defined _R_DEFAULT
-        *(cell *)(data+(int)pri) -= 1;
+        *(cell *)(data+(uintptr_t)pri) -= 1;
       #else
         val=_R(data,pri);
         _W(data,pri,val-1);
@@ -3778,9 +3778,9 @@ int AMXAPI amx_Exec(AMX *amx, cell *retval, int index)
       #if defined _R_DEFAULT
         memcpy(data+(uintptr_t)alt, data+(uintptr_t)pri, (size_t)offs);
       #else
-        for (i=0; i+4<offs; i+=4) {
-          val=_R32(data,pri+i);
-          _W32(data,alt+i,val);
+        for (i=0; i+sizeof(cell)<offs; i+=sizeof(cell)) {
+          val=_R(data,pri+i);
+          _W(data,alt+i,val);
         } /* for */
         for ( ; i<offs; i++) {
           val=_R8(data,pri+i);
@@ -3802,11 +3802,11 @@ int AMXAPI amx_Exec(AMX *amx, cell *retval, int index)
       if (((alt+offs)>hea && (alt+offs)<stk) || (ucell)(alt+offs)>(ucell)amx->stp)
         ABORT(amx,AMX_ERR_MEMACCESS);
       #if defined _R_DEFAULT
-        pri=memcmp(data+(int)alt, data+(int)pri, (int)offs);
+        pri=memcmp(data+(uintptr_t)alt, data+(uintptr_t)pri, (size_t)offs);
       #else
         pri=0;
-        for (i=0; i+4<offs && pri==0; i+=4)
-          pri=_R32(data,alt+i)-_R32(data,pri+i);
+        for (i=0; i+sizeof(cell)<offs && pri==0; i+=sizeof(cell))
+          pri=_R(data,alt+i)-_R(data,pri+i);
         for ( ; i<offs && pri==0; i++)
           pri=_R8(data,alt+i)-_R8(data,pri+i);
       #endif
@@ -3819,7 +3819,7 @@ int AMXAPI amx_Exec(AMX *amx, cell *retval, int index)
       if (((alt+offs)>hea && (alt+offs)<stk) || (ucell)(alt+offs)>(ucell)amx->stp)
         ABORT(amx,AMX_ERR_MEMACCESS);
       for (i=(int)alt; (size_t)offs>=sizeof(cell); i+=sizeof(cell), offs-=sizeof(cell))
-        _W32(data,i,pri);
+        _W(data,i,pri);
       break;
     case OP_HALT:
       GETPARAM(offs);
@@ -3851,7 +3851,7 @@ int AMXAPI amx_Exec(AMX *amx, cell *retval, int index)
       amx->hea=hea;
       amx->frm=frm;
       amx->stk=stk;
-      num=amx->callback(amx,pri,&pri,(cell *)(data+(int)stk));
+      num=amx->callback(amx,pri,&pri,(cell *)(data+(uintptr_t)stk));
       if (num!=AMX_ERR_NONE) {
         if (num==AMX_ERR_SLEEP) {
           amx->pri=pri;
@@ -3870,7 +3870,7 @@ int AMXAPI amx_Exec(AMX *amx, cell *retval, int index)
       amx->hea=hea;
       amx->frm=frm;
       amx->stk=stk;
-      num=amx->callback(amx,offs,&pri,(cell *)(data+(int)stk));
+      num=amx->callback(amx,offs,&pri,(cell *)(data+(uintptr_t)stk));
       if (num!=AMX_ERR_NONE) {
         if (num==AMX_ERR_SLEEP) {
           amx->pri=pri;
@@ -3887,7 +3887,7 @@ int AMXAPI amx_Exec(AMX *amx, cell *retval, int index)
       break;
     case OP_SYMBOL:
       GETPARAM(offs);
-      cip=(cell *)((unsigned char *)cip + (int)offs);
+      cip=(cell *)((unsigned char *)cip+(uintptr_t)offs);
       break;
     case OP_SRANGE:
       SKIPPARAM(2);
@@ -3896,7 +3896,7 @@ int AMXAPI amx_Exec(AMX *amx, cell *retval, int index)
       SKIPPARAM(1);
       break;
     case OP_JUMP_PRI:
-      cip=(cell *)(code+(int)pri);
+      cip=(cell *)(code+(uintptr_t)pri);
       break;
     case OP_SWITCH: {
       cell *cptr;
@@ -3922,12 +3922,12 @@ int AMXAPI amx_Exec(AMX *amx, cell *retval, int index)
     } /* case */
     case OP_SWAP_PRI:
       offs=_R(data,stk);
-      _W32(data,stk,pri);
+      _W(data,stk,pri);
       pri=offs;
       break;
     case OP_SWAP_ALT:
       offs=_R(data,stk);
-      _W32(data,stk,alt);
+      _W(data,stk,alt);
       alt=offs;
       break;
     case OP_PUSH_ADR:
@@ -3946,7 +3946,7 @@ int AMXAPI amx_Exec(AMX *amx, cell *retval, int index)
       amx->hea=hea;
       amx->frm=frm;
       amx->stk=stk;
-      num=amx->callback(amx,offs,&pri,(cell *)(data+(int)stk));
+      num=amx->callback(amx,offs,&pri,(cell *)(data+(uintptr_t)stk));
       stk+=val+sizeof(cell);
       if (num!=AMX_ERR_NONE) {
         if (num==AMX_ERR_SLEEP) {
@@ -4069,12 +4069,12 @@ int AMXAPI amx_Exec(AMX *amx, cell *retval, int index)
     case OP_CONST:
       GETPARAM(offs);
       GETPARAM(val);
-      _W32(data,offs,val);
+      _W(data,offs,val);
       break;
     case OP_CONST_S:
       GETPARAM(offs);
       GETPARAM(val);
-      _W32(data,frm+offs,val);
+      _W(data,frm+offs,val);
       break;
 #endif
     default:
@@ -4130,7 +4130,7 @@ int AMXAPI amx_GetAddr(AMX *amx,cell amx_addr,cell **phys_addr)
   hdr=(AMX_HEADER *)amx->base;
   assert(hdr!=NULL);
   assert(hdr->magic==AMX_MAGIC);
-  data=(amx->data!=NULL) ? amx->data : amx->base+(int)hdr->dat;
+  data=(amx->data!=NULL) ? amx->data : amx->base+(uintptr_t)hdr->dat;
 
   assert(phys_addr!=NULL);
   if ((amx_addr>=amx->hea && amx_addr<amx->stk) || amx_addr<0 || amx_addr>=amx->stp) {
@@ -4138,7 +4138,7 @@ int AMXAPI amx_GetAddr(AMX *amx,cell amx_addr,cell **phys_addr)
     return AMX_ERR_MEMACCESS;
   } /* if */
 
-  *phys_addr=(cell *)(data + (int)amx_addr);
+  *phys_addr=(cell *)(data + (uintptr_t)amx_addr);
   return AMX_ERR_NONE;
 }
 #endif /* AMX_GETADDR */
@@ -4153,14 +4153,14 @@ int AMXAPI amx_Allot(AMX *amx,int cells,cell *amx_addr,cell **phys_addr)
   hdr=(AMX_HEADER *)amx->base;
   assert(hdr!=NULL);
   assert(hdr->magic==AMX_MAGIC);
-  data=(amx->data!=NULL) ? amx->data : amx->base+(int)hdr->dat;
+  data=(amx->data!=NULL) ? amx->data : amx->base+(uintptr_t)hdr->dat;
 
   if (amx->stk - amx->hea - cells*sizeof(cell) < STKMARGIN)
     return AMX_ERR_MEMORY;
   assert(amx_addr!=NULL);
   assert(phys_addr!=NULL);
   *amx_addr=amx->hea;
-  *phys_addr=(cell *)(data + (int)amx->hea);
+  *phys_addr=(cell *)(data + (uintptr_t)amx->hea);
   amx->hea += cells*sizeof(cell);
   return AMX_ERR_NONE;
 }
