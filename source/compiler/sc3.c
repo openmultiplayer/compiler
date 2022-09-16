@@ -1645,7 +1645,8 @@ static int hier2(value *lval)
     } /* if */
     clear_value(lval);
     lval->ident=iCONSTEXPR;
-    lval->constval=tag;
+    /* strip out the top bits, since public tags and default args don't have them */
+    lval->constval=(cell)(ucell)(unsigned int)tag;
     ldconst(lval->constval,sPRI);
     while (paranthese--)
       needtoken(')');
