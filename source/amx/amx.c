@@ -4214,7 +4214,7 @@ int AMXAPI amx_StrLen(const cell *cstr, int *length)
 #if defined AMX_XXXSTRING || defined AMX_EXEC
 int AMXAPI amx_SetStringLen(cell* dest, const char* source, int length, int pack, int use_wchar, size_t size)
 { /* the memory blocks should not overlap */
-	size_t len, i;
+    size_t len, i;
 
     assert_static(UNLIMITED > 0);
     len = length;
@@ -4234,13 +4234,14 @@ int AMXAPI amx_SetStringLen(cell* dest, const char* source, int length, int pack
         } /* if */
 #endif
         /* On Big Endian machines, the characters are well aligned in the
-     * cells; on Little Endian machines, we must swap all cells.
-     */
+         * cells; on Little Endian machines, we must swap all cells.
+         */
         assert(check_endian());
 #if BYTE_ORDER == LITTLE_ENDIAN
         len /= sizeof(cell);
-        while (len >= 0)
-            swapcell((ucell*)&dest[len--]);
+        while (len > 0)
+          swapcell((ucell*)&dest[len--]);
+        swapcell((ucell*)&dest[0]);
 #endif
 
     } else {
