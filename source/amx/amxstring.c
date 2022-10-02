@@ -996,8 +996,8 @@ static cell AMX_NATIVE_CALL n_memcpy(AMX *amx,const cell *params)
     return 0;
   cdest=amx_Address(amx,params[1]);
   csrc=amx_Address(amx,params[2]);
-  pdest=(unsigned char*)cdest+params[3];
-  psrc=(unsigned char*)csrc;
+  pdest=(unsigned char*)cdest;
+  psrc=(unsigned char*)csrc+params[3];
   memmove(pdest,psrc,params[4]);
   return 1;
 }
