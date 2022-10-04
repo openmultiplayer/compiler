@@ -200,15 +200,10 @@ enum seek_whence {
   static FILE* amxfile_GetPointer(ucell fno)
   {
     fno&=~FILE_WRITEABLE_BIT;
-
-    if (gFileCount < 1) {
-	    return 0;
-    }
-
     /* binary search */
-    size_t first=0;
-    size_t last=gFileCount-1;
-    size_t mid=0;
+    int first=0;
+    int last=(int)gFileCount-1;
+    int mid=0;
     cell diff;
     while (first<=last) {
       mid=(first+last)/2;
@@ -226,15 +221,10 @@ enum seek_whence {
   static FILE* amxfile_RemovePointer(ucell fno)
   {
     fno&=~FILE_WRITEABLE_BIT;
-
-    if (gFileCount < 1) {
-	    return 0;
-    }
-
     /* binary search */
-    size_t first=0;
-    size_t last=gFileCount-1;
-    size_t mid=0;
+    int first=0;
+    int last=(int)gFileCount-1;
+    int mid=0;
     cell diff;
     while (first<=last) {
       mid=(first+last)/2;
