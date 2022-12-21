@@ -1622,6 +1622,7 @@ int AMXAPI amx_SetUserData(AMX *amx, long tag, void *ptr)
 #endif /* AMX_XXXUSERDATA */
 
 #if defined AMX_REGISTER || defined AMX_EXEC || defined AMX_INIT
+#if !defined OVERWRITE_AMX_REGISTER
 static AMX_NATIVE findfunction(const char *name, const AMX_NATIVE_INFO *list, int number)
 {
   int i;
@@ -1663,6 +1664,7 @@ int AMXAPI amx_Register(AMX *amx, const AMX_NATIVE_INFO *list, int number)
     amx->flags|=AMX_FLAG_NTVREG;
   return err;
 }
+#endif /* OVERWRITE_AMX_REGISTER */
 #endif /* AMX_REGISTER || AMX_EXEC || AMX_INIT */
 
 #if defined AMX_NATIVEINFO
