@@ -197,7 +197,7 @@ static cell AMX_NATIVE_CALL n_strlen(AMX *amx,const cell *params)
   int len = 0;
 
   (void)(amx);
-  cptr=amx_Address(amx,params[1]);
+  amx_GetAddr(amx,params[1],&cptr);
   amx_StrLen(cptr,&len);
   return len;
 }
@@ -209,12 +209,12 @@ static cell AMX_NATIVE_CALL n_strpack(AMX *amx,const cell *params)
   cell *cdest,*csrc;
   int len,err;
 
-  csrc=amx_Address(amx,params[2]);
+  amx_GetAddr(amx,params[2],&csrc);
   amx_StrLen(csrc,&len);
   if ((unsigned)len>params[3]*sizeof(cell)-1)
     len=params[3]*sizeof(cell)-1;
 
-  cdest=amx_Address(amx,params[1]);
+  amx_GetAddr(amx,params[1],&cdest);
   err=amx_StrPack(cdest,csrc,len,0);
   if (err!=AMX_ERR_NONE)
     return amx_RaiseError(amx,err);
@@ -229,13 +229,13 @@ static cell AMX_NATIVE_CALL n_strunpack(AMX *amx,const cell *params)
   cell *cdest,*csrc;
   int len,err;
 
-  csrc=amx_Address(amx,params[2]);
+  amx_GetAddr(amx,params[2],&csrc);
   amx_StrLen(csrc,&len);
   assert(len>=0);
   if (len>=params[3])
     len=params[3]-1;
 
-  cdest=amx_Address(amx,params[1]);
+  amx_GetAddr(amx,params[1],&cdest);
   err=amx_StrUnpack(cdest,csrc,len);
   if (err!=AMX_ERR_NONE)
     return amx_RaiseError(amx,err);
@@ -254,8 +254,8 @@ static cell AMX_NATIVE_CALL n_strcat(AMX *amx,const cell *params)
   int packed,err;
 
   /* calculate number of cells needed for (packed) destination */
-  csrc=amx_Address(amx,params[2]);
-  cdest=amx_Address(amx,params[1]);
+  amx_GetAddr(amx,params[2],&csrc);
+  amx_GetAddr(amx,params[1],&cdest);
   amx_StrLen(csrc,&len);
   amx_StrLen(cdest,&len2);
   packed=(*cdest==0) ? ((ucell)*csrc>UNPACKEDMAX) : ((ucell)*cdest>UNPACKEDMAX);
@@ -289,8 +289,8 @@ static cell AMX_NATIVE_CALL n_strcopy(AMX *amx,const cell *params)
   int len,packed,err;
 
   /* calculate number of cells needed for (packed) destination */
-  csrc=amx_Address(amx,params[2]);
-  cdest=amx_Address(amx,params[1]);
+  amx_GetAddr(amx,params[2],&csrc);
+  amx_GetAddr(amx,params[1],&cdest);
   amx_StrLen(csrc,&len);
   packed=(ucell)*csrc>UNPACKEDMAX;
   if (packed) {
@@ -340,8 +340,8 @@ static cell AMX_NATIVE_CALL n_strcmp(AMX *amx,const cell *params)
   cell result;
 
   (void)(amx);
-  cstr1=amx_Address(amx,params[1]);
-  cstr2=amx_Address(amx,params[2]);
+  amx_GetAddr(amx,params[1],&cstr1);
+  amx_GetAddr(amx,params[2],&cstr2);
 
   /* get the maximum length to compare */
   amx_StrLen(cstr1,&len1);
@@ -373,8 +373,8 @@ static cell AMX_NATIVE_CALL n_strfind(AMX *amx,const cell *params)
   cell c,f;
 
   (void)(amx);
-  cstr=amx_Address(amx,params[1]);
-  csub=amx_Address(amx,params[2]);
+  amx_GetAddr(amx,params[1],&cstr);
+  amx_GetAddr(amx,params[2],&csub);
 
   /* get the maximum length to compare */
   amx_StrLen(cstr,&lenstr);
@@ -417,8 +417,8 @@ static cell AMX_NATIVE_CALL n_strmid(AMX *amx,const cell *params)
   int end=params[4];
 
   /* calculate number of cells needed for (packed) destination */
-  csrc=amx_Address(amx,params[2]);
-  cdest=amx_Address(amx,params[1]);
+  amx_GetAddr(amx,params[2],&csrc);
+  amx_GetAddr(amx,params[1],&cdest);
   amx_StrLen(csrc,&len);
 
   /* clamp the start/end parameters */
@@ -476,7 +476,7 @@ static cell AMX_NATIVE_CALL n_strdel(AMX *amx,const cell *params)
 
   (void)(amx);
   /* calculate number of cells needed for (packed) destination */
-  cstr=amx_Address(amx,params[1]);
+  amx_GetAddr(amx,params[1],&cstr);
   amx_StrLen(cstr,&length);
 
   index=(int)params[2];
@@ -522,8 +522,8 @@ static cell AMX_NATIVE_CALL n_strins(AMX* amx, const cell* params)
 
     /* calculate number of cells needed for (packed) destination */
 
-    cstr = amx_Address(amx, params[1]);
-    csub = amx_Address(amx, params[2]);
+    amx_GetAddr(amx, params[1],&cstr);
+    amx_GetAddr(amx, params[2],&csub);
 
     amx_StrLen(cstr, &lenstr);
     amx_StrLen(csub, &lensub);
@@ -624,7 +624,7 @@ static cell AMX_NATIVE_CALL n_strval(AMX *amx,const cell *params)
 
   (void)(amx);
   /* get parameters */
-  cstr=amx_Address(amx,params[1]);
+  amx_GetAddr(amx,params[1],&cstr);
   amx_StrLen(cstr,&len);
   if (len == 0)
     return 0;
@@ -711,7 +711,7 @@ static cell AMX_NATIVE_CALL n_valstr(AMX *amx,const cell *params)
   } /* while */
   if (negate)
     str[0]='-';
-  cstr=amx_Address(amx,params[1]);
+  amx_GetAddr(amx,params[1],&cstr);
   amx_SetString(cstr,str,params[3],sizeof(TCHAR)>1,sizearray(str));
   return result;
 }
@@ -719,7 +719,8 @@ static cell AMX_NATIVE_CALL n_valstr(AMX *amx,const cell *params)
 /* ispacked(const string[]) */
 static cell AMX_NATIVE_CALL n_ispacked(AMX *amx,const cell *params)
 {
-  cell *cstr=amx_Address(amx,params[1]);
+  cell *cstr;
+  amx_GetAddr(amx,params[1],&cstr);
   (void)(amx);
   return (ucell)*cstr>UNPACKEDMAX;
 }
@@ -801,12 +802,12 @@ static cell AMX_NATIVE_CALL n_uudecode(AMX *amx,const cell *params)
 
   (void)(amx);
   /* get the source */
-  cstr=amx_Address(amx,params[2]);
+  amx_GetAddr(amx,params[2],&cstr);
   amx_GetString(src,cstr,0,sizeof src);
   /* decode */
   len=uudecode(dst,src);
   /* store */
-  cstr=amx_Address(amx,params[1]);
+  amx_GetAddr(amx,params[1],&cstr);
   size=len;
   if (size>params[3]*sizeof(cell))
     size=params[3]*sizeof(cell);
@@ -829,12 +830,12 @@ static cell AMX_NATIVE_CALL n_uuencode(AMX *amx,const cell *params)
 
   (void)(amx);
   /* get the source */
-  cstr=amx_Address(amx,params[2]);
+  amx_GetAddr(amx,params[2],&cstr);
   amx_GetString((char *)src,cstr,0,sizeof src);
   /* encode (and check for errors) */
   if (uuencode(dst,src,params[3])) {
     if (params[4]>0) {
-      cstr=amx_Address(amx,params[1]);
+      amx_GetAddr(amx,params[1],&cstr);
       *cstr=0;
     } /* if */
     return 0;
@@ -843,7 +844,7 @@ static cell AMX_NATIVE_CALL n_uuencode(AMX *amx,const cell *params)
   assert(strlen(dst)+1<sizeof dst);
   strcat(dst,"\n");
   /* store */
-  cstr=amx_Address(amx,params[1]);
+  amx_GetAddr(amx,params[1],&cstr);
   amx_SetString(cstr,dst,1,0,params[4]);
   return (((params[3]+2)/3) << 2)+2;
 }
@@ -903,7 +904,7 @@ static cell AMX_NATIVE_CALL n_urldecode(AMX *amx,const cell *params)
   str[idx_dst]='\0';
 
   /* store */
-  cstr=amx_Address(amx,params[1]);
+  amx_GetAddr(amx,params[1],&cstr);
   amx_SetString(cstr,str,1,0,params[4]); /* store as packed ot unpacked */
 
   return idx_dst;
@@ -936,7 +937,7 @@ static cell AMX_NATIVE_CALL n_urlencode(AMX *amx,const cell *params)
     return 0;
   if ((str = (TCHAR*)alloca(length * sizeof(TCHAR)))==NULL)
     return 0;
-  cstr=amx_Address(amx,params[2]);
+  amx_GetAddr(amx,params[2],&cstr);
   amx_GetString((char*)str, cstr, sizeof(TCHAR)>1, length);
 
   /* run through the string and determine the new length */
@@ -973,7 +974,7 @@ static cell AMX_NATIVE_CALL n_urlencode(AMX *amx,const cell *params)
   assert(destlen==0);
 
   /* store the result */
-  cstr=amx_Address(amx,params[1]);
+  amx_GetAddr(amx,params[1],&cstr);
   amx_SetString(cstr,str,1,0,params[4]); /* store as packed ot unpacked */
 
   return (cell)strlen(str);
@@ -994,8 +995,8 @@ static cell AMX_NATIVE_CALL n_memcpy(AMX *amx,const cell *params)
   (void)(amx);
   if (params[3]<0 || params[4]<0 || (params[3]+params[4])>params[5]*(int)sizeof(cell))
     return 0;
-  cdest=amx_Address(amx,params[1]);
-  csrc=amx_Address(amx,params[2]);
+  amx_GetAddr(amx,params[1],&cdest);
+  amx_GetAddr(amx,params[2],&csrc);
   pdest=(unsigned char*)cdest;
   psrc=(unsigned char*)csrc+params[3];
   memmove(pdest,psrc,params[4]);
@@ -1044,11 +1045,11 @@ static cell AMX_NATIVE_CALL n_strformat(AMX *amx,const cell *params)
     info.user=output;
     output[0] = __T('\0');
 
-    cstr=amx_Address(amx,params[4]);
+    amx_GetAddr(amx,params[4],&cstr);
     amx_printstring(amx,cstr,&info);
 
     /* store the output string */
-    cstr=amx_Address(amx,params[1]);
+    amx_GetAddr(amx,params[1],&cstr);
     amx_SetString(cstr,(char*)output,(int)params[3],sizeof(TCHAR)>1,(int)params[2]);
     return 1;
   #endif
