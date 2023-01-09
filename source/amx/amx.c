@@ -1363,19 +1363,49 @@ int AMXAPI amx_FindNative(AMX* amx, const char* name, int* index)
 
   if (entries) {
     int idx = 0;
-    AMX_FUNCPART* func;
-    for (idx = 0; idx != entries; ++idx) {
-      func = GETENTRY(hdr, natives, idx);
-      if (!strcmp(name, GETENTRYNAME(hdr, func))) {
-        *index = idx;
-        return AMX_ERR_NONE;
+    #ifdef AMX_WIDE_POINTERS
+      /* We know that the nametable is in order.  We can't use the offset in `func` to jump in to
+         that table, but we can search through it manually (and sadly linearly).  Since *all*
+         native pointers might be clobbered we need to start with the last public name instead. */
+      int numpublics = NUMENTRIES(hdr, publics, natives);
+      char* curname;
+      if (numpublics) {
+        /* Get the name of the last public, then skip it. */
+        --numpublics;
+        curname=GETENTRYNAME(hdr, GETENTRY(hdr, publics, numpublics));
+        /* Skip the current name, with its NULL. */
+        curname=curname+strlen(curname)+1;
+      } else if (USENAMETABLE(hdr)) {
+        /* Probably a rare case, but we could have 0 publics, in which case the nametable pointer is
+           already the start of the native names and we don't need to skip over anything. */
+        curname=(char*)hdr+hdr->nametable;
+      } else {
+        /* Old AMX versions. */
+        return AMX_ERR_VERSION;
       }
-    }
+      for (idx=0; idx!=entries; ++idx) {
+        if (!strcmp(name,curname)) {
+          *index=idx;
+          return AMX_ERR_NONE;
+        }
+        /* Skip the current name, with its NULL. */
+        curname=curname+strlen(curname)+1;
+      }
+    #else
+      AMX_FUNCPART* func;
+      for (idx=0; idx!=entries; ++idx) {
+        func=GETENTRY(hdr,natives,idx);
+        if (!strcmp(name,GETENTRYNAME(hdr,func))) {
+          *index=idx;
+          return AMX_ERR_NONE;
+        }
+      }
+    #endif
   }
 
-    /* not found, set to an invalid index, so amx_Exec() will fail */
-    *index = INT_MAX;
-    return AMX_ERR_NOTFOUND;
+  /* not found, set to an invalid index, so amx_Exec() will fail */
+  *index = INT_MAX;
+  return AMX_ERR_NOTFOUND;
 }
 #endif /* AMX_XXXNATIVES */
 
