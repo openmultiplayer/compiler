@@ -506,7 +506,7 @@ static int amx_BrowseRelocate(AMX *amx)
   long codesize;
   OPCODE op;
   int sysreq_flg;
-  #if defined __GNUC__ || defined __ICC || defined ASM32 || defined JIT
+  #if (defined __GNUC__ || defined __ICC || defined ASM32 || defined JIT) && !(defined __64BIT__ && PAWN_CELL_SIZE < 64)
     cell *opcode_list;
   #endif
   #if defined JIT
@@ -534,7 +534,7 @@ static int amx_BrowseRelocate(AMX *amx)
   assert_static(OP_LOAD_BOTH==154);
 
   sysreq_flg=0;
-  #if defined __GNUC__ || defined __ICC || defined ASM32 || defined JIT
+  #if (defined __GNUC__ || defined __ICC || defined ASM32 || defined JIT) && !(defined __64BIT__ && PAWN_CELL_SIZE < 64)
     amx_Exec(amx, (cell*)(void*)&opcode_list, 0);
   #endif
 
@@ -545,7 +545,7 @@ static int amx_BrowseRelocate(AMX *amx)
       amx->flags &= ~AMX_FLAG_BROWSE;
       return AMX_ERR_INVINSTR;
     } /* if */
-    #if defined __GNUC__ || defined __ICC || defined ASM32 || defined JIT
+    #if (defined __GNUC__ || defined __ICC || defined ASM32 || defined JIT) && !(defined __64BIT__ && PAWN_CELL_SIZE < 64)
       /* relocate opcode (only works if the size of an opcode is at least
        * as big as the size of a pointer (jump address); so basically we
        * rely on the opcode and a pointer being 32-bit
@@ -1839,7 +1839,7 @@ int AMXAPI amx_PushString(AMX *amx, cell *amx_addr, cell **phys_addr, const char
 #define CHKSTACK()      if (stk>amx->stp) return AMX_ERR_STACKLOW
 #define CHKHEAP()       if (hea<amx->hlw) return AMX_ERR_HEAPLOW
 
-#if (defined __GNUC__ || defined __ICC) && !(defined ASM32 || defined JIT)
+#if (defined __GNUC__ || defined __ICC) && !(defined ASM32 || defined JIT) && !defined __64BIT__
     /* GNU C version uses the "labels as values" extension to create
      * fast "indirect threaded" interpreter. The Intel C/C++ compiler
      * supports this too.
