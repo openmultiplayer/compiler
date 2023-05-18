@@ -1,5 +1,5 @@
 #==============================================================================#
-cmake_minimum_required(VERSION 3.24 FATAL_ERROR)
+cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
 cmake_policy(SET CMP0115 NEW)
 #==============================================================================#
 set(VERSION_MAJOR 3)
