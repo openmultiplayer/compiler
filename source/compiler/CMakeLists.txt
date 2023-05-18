@@ -9,7 +9,7 @@ set(VERSION ${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_BUILD})
 set(VERSION_STR ${VERSION})
 math(EXPR VERSION_INT "${VERSION_MAJOR} << 8 | ${VERSION_MINOR}")
 #==============================================================================#
-project(pawncc
+project(pawnc
 	LANGUAGES C
 	VERSION ${VERSION}
 	DESCRIPTION "OpenMultiplayer's fork of Compuphase's Pawn Language Compiler'"
