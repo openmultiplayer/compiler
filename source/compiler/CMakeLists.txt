@@ -69,6 +69,14 @@ endif()
 if(APPLE)
   set(CMAKE_MACOSX_RPATH ON)
 endif()
+
+if(DEFINED PAWN_MAX_FUNC_NAME
+    AND  PAWN_MAX_FUNC_NAME MATCHES "^[0-9]+$"
+    AND NOT PAWN_MAX_FUNC_NAME LESS 31)
+  add_definitions(-DsNAMEMAX=${PAWN_MAX_FUNC_NAME})
+else()
+  add_definitions(-DsNAMEMAX=63)
+endif()
 #==============================================================================#
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/version.h.in
                ${CMAKE_CURRENT_BINARY_DIR}/version.h)
