@@ -40,7 +40,7 @@ foreach(INCLUDE_FILE ${REQUIRED_INCLUDE_FILES})
 endforeach()
 
 # check for optional library functions
-set(REQUIRED_INCLUDE_FILES
+set(REQUIRED_FUNCTIONS
 	strlcpy
 	strlcat
 )
