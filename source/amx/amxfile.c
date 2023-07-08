@@ -622,6 +622,9 @@ static cell AMX_NATIVE_CALL n_fopen(AMX *amx, const cell *params)
     if (f==NULL && altattrib!=NULL)
       f=_tfopen(fullname,altattrib);
   } /* if */
+  if (f==NULL) {
+    return 0;
+  }
   return FILE_ADD_POINTER(f, mode);
 }
 
@@ -833,7 +836,11 @@ static cell AMX_NATIVE_CALL n_ftemp(AMX *amx, const cell *params)
 {
   (void)amx;
   (void)params;
-  return FILE_ADD_POINTER(tmpfile(), FILE_WRITEABLE_BIT);
+  FILE* f=tmpfile();
+  if (f==NULL) {
+    return 0;
+  }
+  return FILE_ADD_POINTER(f, FILE_WRITEABLE_BIT);
 }
 
 /* fseek(File: handle, position, seek_whence: whence=seek_start) */
