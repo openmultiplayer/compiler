@@ -11,7 +11,7 @@ math(EXPR VERSION_INT "${VERSION_MAJOR} << 8 | ${VERSION_MINOR}")
 #==============================================================================#
 project(pawnc
 	LANGUAGES C
-	VERSION ${VERSION}
+	#VERSION ${VERSION}
 	DESCRIPTION "OpenMultiplayer's fork of Compuphase's Pawn Language Compiler'"
 )
 
