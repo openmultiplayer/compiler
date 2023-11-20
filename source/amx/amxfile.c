@@ -894,7 +894,7 @@ static cell AMX_NATIVE_CALL n_ftouch(AMX *amx, const cell *params)
   /* get the filename */
   amx_StrParam(amx,params[1],name);
   if (name!=NULL && completename(fullname,name,sizearray(fullname))!=NULL) {
-    f=_tfopen(fullname,__T("wb"));
+    f=_tfopen(fullname,__T("ab"));
     if (f!=NULL) {
       return fclose(f) == 0;
     }
