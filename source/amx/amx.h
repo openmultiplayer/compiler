@@ -231,6 +231,7 @@ extern  "C" {
 
 #define UNPACKEDMAX   (((ucell)1 << (sizeof(ucell)-1)*8) - 1)
 #define UNLIMITED     (~1u >> 1)
+#define STKMARGIN     ((cell)(16*sizeof(cell)))
 
 struct tagAMX;
 typedef cell (AMX_NATIVE_CALL *AMX_NATIVE)(struct tagAMX *amx, const cell *params);

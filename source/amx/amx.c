@@ -1707,9 +1707,6 @@ AMX_NATIVE_INFO * AMXAPI amx_NativeInfo(const char *name, AMX_NATIVE func)
 }
 #endif /* AMX_NATIVEINFO */
 
-
-#define STKMARGIN       ((cell)(16*sizeof(cell)))
-
 #if defined AMX_PUSHXXX
 
 int AMXAPI amx_Push(AMX *amx, cell value)
