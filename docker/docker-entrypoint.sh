@@ -8,7 +8,7 @@ cmake \
     -B build \
     -G Ninja \
     -DCMAKE_BUILD_TYPE=$config \
-    -DCMAKE_C_FLAGS=-m32 \
+    -DCMAKE_C_FLAGS="-m32 -DsNAMEMAX=63" \
     -DBUILD_TESTING=False \
 &&
 cmake \
