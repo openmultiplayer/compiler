@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-windows:
-    runs-on: windows-2019
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -20,7 +20,7 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake -DCMAKE_BUILD_TYPE=Release ../source/compiler -A Win32 -G "Visual Studio 16 2019" -DCMAKE_C_FLAGS="/D sNAMEMAX=63"
+          cmake -DCMAKE_BUILD_TYPE=Release ../source/compiler -A Win32 -G "Visual Studio 17 2022" -DCMAKE_C_FLAGS="/D sNAMEMAX=63"
           cmake --build . --config Release
 
       - name: Upload artifacts
