@@ -793,6 +793,7 @@ static int amx_BrowseRelocate(AMX *amx)
   #else
     assert(sysreq_flg==0 || sysreq_flg==0x01 || sysreq_flg==0x02 || sysreq_flg==0x03);
   #endif
+
   #if defined JIT
     amx->code_size = getMaxCodeSize()*opcode_count + hdr->cod
                      + (hdr->stp - hdr->dat);
@@ -1047,7 +1048,7 @@ int AMXAPI amx_Init(AMX *amx,void *program)
     hdr=(AMX_HEADER *)amx->base;
     numlibraries=NUMENTRIES(hdr,libraries,pubvars);
     for (i=0; i<numlibraries; i++) {
-      lib=(AMX_FUNCWIDE*)GETENTRY(hdr, libraries, i);
+      lib=(AMX_FUNCWIDE*)GETENTRY(hdr,libraries,i);
       libname[0]='\0';
       #if defined LINUX || defined __FreeBSD__ || defined __OpenBSD__
         if (root!=NULL && *root!='\0') {
@@ -1404,7 +1405,7 @@ int AMXAPI amx_FindNative(AMX* amx, const char* name, int* index)
   }
 
   /* not found, set to an invalid index, so amx_Exec() will fail */
-  *index = INT_MAX;
+  *index=INT_MAX;
   return AMX_ERR_NOTFOUND;
 }
 #endif /* AMX_XXXNATIVES */
