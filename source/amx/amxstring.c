@@ -542,8 +542,8 @@ static cell AMX_NATIVE_CALL n_strins(AMX* amx, const cell* params)
   if (index > lenstr || index > maxlen)
     return amx_RaiseError(amx, AMX_ERR_NATIVE);
 
-  /* current string is empty (and the insertion point is zero), just make a copy */
   if (lenstr == 0) {
+    /* current string is empty (and the insertion point is zero), just make a copy */
     assert(index == 0);
 
     if (lensub > maxlen)
@@ -554,7 +554,7 @@ static cell AMX_NATIVE_CALL n_strins(AMX* amx, const cell* params)
     else
       amx_StrUnpack(cstr, csub, lensub);
     return 1;
-  }
+  } /* if */
 
   if (lenstr + lensub >= maxlen && index + lensub >= maxlen) {
     int max_substr = maxlen - index;
@@ -564,18 +564,18 @@ static cell AMX_NATIVE_CALL n_strins(AMX* amx, const cell* params)
         c = extractchar(csub, count, 0);
         ptr = packedptr(cstr, index + count);
         *ptr = (unsigned char)c;
-      }
+      } /* for */
       *(packedptr(cstr, maxlen)) = 0;
     } else {
       for (count = 0; count < max_substr; count++) {
         c = extractchar(csub, count, 0);
         cstr[index + count] = c;
-      }
+      } /* for */
       cstr[maxlen] = 0;
-    }
+    } /* if */
 
     return 1;
-  }
+  } /* if */
 
   int final_len = lenstr + lensub; /* length after insertion */
 
@@ -589,14 +589,14 @@ static cell AMX_NATIVE_CALL n_strins(AMX* amx, const cell* params)
       c = *ptr;
       ptr = packedptr(cstr, count);
       *ptr = (unsigned char)c;
-    }
+    } /* for */
 
     /* copy in the new characters */
     for (count = 0; count < lensub; count++) {
       c = extractchar(csub, count, 0);
       ptr = packedptr(cstr, index + count);
       *ptr = (unsigned char)c;
-    }
+    } /* for */
     *(packedptr(cstr, maxlen)) = 0;
   } else {
     /* make room for the new characters */
@@ -607,9 +607,9 @@ static cell AMX_NATIVE_CALL n_strins(AMX* amx, const cell* params)
     for (count = 0; count < lensub; count++) {
       c = extractchar(csub, count, 0);
       cstr[index + count] = c;
-    }
+    } /* for */
     cstr[maxlen] = 0;
-  }
+  } /* if */
 
   return 1;
 }
