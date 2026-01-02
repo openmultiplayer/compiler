@@ -1775,7 +1775,7 @@ int AMXAPI amx_PushString(AMX *amx, cell *amx_addr, cell **phys_addr, const char
   assert(string!=NULL);
 
   #if defined AMX_ANSIONLY
-    length = strlen(string) + 1;
+    length = strlen(string);
   #else
     length = (use_wchar ? wcslen((const wchar_t*)string) : strlen(string));
   #endif
