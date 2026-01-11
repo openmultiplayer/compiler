@@ -283,7 +283,7 @@ static cell AMX_NATIVE_CALL core_tolower(AMX *amx,const cell *params)
   #endif
 }
 
-static cell AMX_NATIVE_CALL core_toupper(AMX *amx, const cell *params)
+static cell AMX_NATIVE_CALL core_toupper(AMX *amx,const cell *params)
 {
   (void)amx;
   #if (defined __WIN32__ || defined _WIN32 || defined WIN32) && !defined _WIN64
@@ -347,7 +347,7 @@ static cell AMX_NATIVE_CALL getproperty(AMX *amx,const cell *params)
   /* if list_finditem() found the value, store the name */
   if (item!=NULL && item->value==params[3] && strlen(name)==0) {
     amx_GetAddr(amx,params[4],&cstr);
-    amx_SetString(cstr,item->name,1,0, UNLIMITED);
+    amx_SetString(cstr,item->name,1,0,UNLIMITED);
   } /* if */
   free(name);
   return (item!=NULL) ? item->value : 0;

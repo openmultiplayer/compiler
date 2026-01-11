@@ -664,7 +664,7 @@ static cell AMX_NATIVE_CALL n_fwrite(AMX *amx, const cell *params)
   if ((ucell)*cptr>UNPACKEDMAX) {
     /* the string is packed, write it as an ASCII/ANSI string */
     if ((str=(char*)alloca(len + 1))!=NULL) {
-      amx_GetString(str,cptr,0,len);
+      amx_GetString(str,cptr,0,len+1);
       r=fputs(str,f);
     } /* if */
   } else {
@@ -975,7 +975,7 @@ static cell AMX_NATIVE_CALL n_flength(AMX *amx, const cell *params)
   }
 
   long l,c;
-  int fn = fileno(f);
+  int fn=fileno(f);
   if (params[1]&FILE_WRITEABLE_BIT) {
     /* writable, flush */
     fflush(f);
@@ -983,7 +983,7 @@ static cell AMX_NATIVE_CALL n_flength(AMX *amx, const cell *params)
     _commit(fn);
 #endif
   }
-  c=lseek(fn,0,SEEK_CUR); 
+  c=lseek(fn,0,SEEK_CUR); /* save the current position */
   l=lseek(fn,0,SEEK_END); /* return the file position at its end */
   fseek(f,c,SEEK_SET);   /* restore the file pointer */
   (void)amx;
@@ -1073,7 +1073,7 @@ static cell AMX_NATIVE_CALL n_fexist(AMX *amx, const cell *params)
   (void)amx;
   amx_StrParam(amx,params[1],name);
   if (name!=NULL && completename(fullname,name,sizearray(fullname))!=NULL)
-      r = !access(fullname, 0);
+    r = !access(fullname, 0);
   return r;
 }
 

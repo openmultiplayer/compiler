@@ -12,6 +12,7 @@
 native strlen(const string[]);
 native strpack(dest[], const source[], maxlength=sizeof dest);
 native strunpack(dest[], const source[], maxlength=sizeof dest);
+native strcopy(dest[], const source[], maxlength=sizeof dest);
 native strcat(dest[], const source[], maxlength=sizeof dest);
 
 native strmid(dest[], const source[], start=0, end=cellmax, maxlength=sizeof dest);
@@ -32,4 +33,4 @@ native uuencode(dest[], const source[], numbytes, maxlength=sizeof dest);
 native memcpy(dest[], const source[], index=0, numbytes, maxlength=sizeof dest);
 
 stock bool: strequal(const string1[], const string2[], bool:ignorecase=false, length=cellmax)
-    return strcmp(string1, string2, ignorecase, length) == 0
+    return strcmp(string1, string2, ignorecase, length) == 0;

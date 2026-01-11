@@ -113,13 +113,13 @@ seems to be based on an older release of Pawn.
 [build_win]: https://ci.appveyor.com/project/Southclaws/compiler/branch/master
 [build_status_win]:
   https://ci.appveyor.com/api/projects/status/k112tbr1afrkif0n?svg=true
-[team]: https://github.com/pawn-lang/compiler/graphs/contributors
+[team]: https://github.com/openmultiplayer/compiler/graphs/contributors
 [original_readme]:
-  https://github.com/pawn-lang/compiler/tree/master/readme_compuphase.txt
-[issues]: https://github.com/pawn-lang/compiler/issues
+  https://github.com/openmultiplayer/compiler/tree/master/readme_compuphase.txt
+[issues]: https://github.com/openmultiplayer/compiler/issues
 [bugs]: https://github.com/pawn-lang/compiler/wiki/Known-compiler-bugs
 [new]: https://github.com/pawn-lang/compiler/wiki/What's-new
-[releases]: https://github.com/pawn-lang/compiler/releases
+[releases]: https://github.com/openmultiplayer/compiler/releases
 [artifacts]:
   https://ci.appveyor.com/project/Southclaws/compiler/branch/master/artifacts
 [compat]: https://github.com/pawn-lang/compiler/wiki/Compatibility-mode

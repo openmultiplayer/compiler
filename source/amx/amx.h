@@ -203,7 +203,7 @@ extern  "C" {
 
 #if !defined PAWN_CELL_SIZE
   #if defined __64BIT__
-    #define PAWN_CELL_SIZE 64     /* by default, use 32-bit cells */
+    #define PAWN_CELL_SIZE 64     /* use 64-bit cells for 64-bit systems */
   #else
     #define PAWN_CELL_SIZE 32     /* by default, use 32-bit cells */
   #endif
@@ -244,9 +244,8 @@ typedef int (AMXAPI *AMX_IDLE)(struct tagAMX *amx, int AMXAPI Exec(struct tagAMX
 #endif
 
 #if defined _MSC_VER
-  #pragma warning(disable:4103)  /* disable warning message 4103 that complains
-                                  * about pragma pack in a header file */
   #pragma warning(disable:4100)  /* "'%$S' : unreferenced formal parameter" */
+  #pragma warning(disable:4103)  /* disable warning message 4103 that complains about pragma pack in a header file */
   #pragma warning(disable:4127)  /* "conditional expression is constant" (needed for static_assert) */
   #pragma warning(disable:4996)  /* POSIX name is deprecated */
 #elif defined __GNUC__
