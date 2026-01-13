@@ -312,6 +312,15 @@ typedef struct s_valuepair {
   long second;
 } valuepair;
 
+typedef struct s_builtinstring {
+  struct {
+    char name[sNAMEMAX+1];
+    char value[_MAX_PATH];
+  } *entries;
+  int count;
+  int size;
+} builtinstring;
+
 /* struct "symstate" is used to:
  * * synchronize the status of assignments between all "if" branches or "switch"
  *   cases, so the compiler could detect unused assignments in all of those
@@ -1032,6 +1041,7 @@ SC_VDECL int pc_isrecording;  /* true if recording input */
 SC_VDECL char *pc_recstr;     /* recorded input */
 SC_VDECL int pc_loopcond;     /* equals to 'tFOR', 'tWHILE' or 'tDO' if the current expression is a loop condition, zero otherwise */
 SC_VDECL int pc_numloopvars;  /* number of variables used inside a loop condition */
+SC_VDECL builtinstring builtin_strings;
 
 SC_VDECL char *sc_tokens[];
 
