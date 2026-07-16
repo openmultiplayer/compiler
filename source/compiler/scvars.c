@@ -107,6 +107,7 @@ SC_VDEFINE int pc_isrecording=FALSE;        /* true if recording input */
 SC_VDEFINE char *pc_recstr=NULL;            /* recorded input */
 SC_VDEFINE int pc_loopcond=FALSE;           /* true if the current expression is a loop condition */
 SC_VDEFINE int pc_numloopvars=0;            /* number of variables used inside a loop condition */
+SC_VDEFINE builtinstring builtin_strings={NULL, 0, 0};
 
 SC_VDEFINE char *sc_tokens[] = {
   "*=", "/=", "%=", "+=", "-=", "<<=", ">>>=", ">>=", "&=", "^=", "|=",

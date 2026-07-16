@@ -121,6 +121,9 @@ static void testloopvariables(symstate *loopvars,int dowhile,int line);
 static void destructsymbols(symbol *root,int level);
 static constvalue *find_constval_byval(constvalue_root *table,cell val);
 static symbol *fetchlab(char *name);
+static void remember_builtin_string(const char *name,const char *value);
+static void register_builtin_string(void);
+static void delete_builtin_string(void);
 static void statement(int *lastindent,int allow_decl);
 static void compound(int stmt_sameline,int starttok);
 static int test(int label,int parens,int invert);
@@ -867,6 +870,7 @@ cleanup:
   #endif
   delete_autolisttable();
   delete_heaplisttable();
+  delete_builtin_string();
   if (errnum!=0) {
     if (strempty(errfname))
       pc_printf("\n%d Error%s.\n",errnum,(errnum>1) ? "s" : "");
@@ -1341,8 +1345,18 @@ static void parseoptions(int argc,char **argv,char *oname,char *ename,char *pnam
         error(200,argv[arg],sNAMEMAX);  /* symbol too long, truncated to sNAMEMAX chars */
       } /* if */
       strlcpy(str,argv[arg],i+1);       /* str holds symbol name */
-      i=atoi(ptr+1);
-      add_builtin_constant(str,i,sGLOBAL,0);
+      if (*(ptr+1)=='\"') {
+        char strval[_MAX_PATH];
+        strlcpy(strval,ptr+2,sizeof(strval));
+        int len=strlen(strval);
+        if (len>0 && strval[len-1]=='\"')
+          strval[len-1]='\0';
+        remember_builtin_string(str,strval);
+      }
+      else {
+        i=atoi(ptr+1);
+        add_builtin_constant(str,i,sGLOBAL,0);
+      }
     } else if (oname) {
       strlcpy(str,argv[arg],arraysize(str)-2); /* -2 because default extension is ".p" */
       set_extension(str,".p",FALSE);
@@ -1705,6 +1719,8 @@ static void setstringconstants(void)
   add_builtin_string_constant("__time",timebuf,sGLOBAL);
   strftime(datebuf,arraysize(datebuf),"%d %b %Y",localtime(&now));
   add_builtin_string_constant("__date",datebuf,sGLOBAL);
+
+  register_builtin_string();
 }
 
 static int getclassspec(int initialtok,int *fpublic,int *fstatic,int *fstock,int *fconst)
@@ -5691,6 +5707,48 @@ SC_FUNC symbol *add_builtin_string_constant(char *name,const char *val,
   sym->usage|=uDEFINE;
   sym->flags|=flagPREDEF;
   return sym;
+}
+
+static void remember_builtin_string(const char *name,const char *value) 
+{
+  builtinstring *tbl=&builtin_strings;
+  int newsize;
+  void *p;
+
+  assert(tbl!=NULL);
+  if (tbl->count>=tbl->size) {
+    newsize=(tbl->size==0) ? 2 : tbl->size*2;
+    p=realloc(tbl->entries,newsize*sizeof(*tbl->entries));
+    if (p==NULL) {
+      error(103);
+      return;
+    }
+    tbl->entries=p;
+    tbl->size=newsize;
+  }
+  strlcpy(tbl->entries[tbl->count].name,name,sizeof(tbl->entries[tbl->count].name));
+  strlcpy(tbl->entries[tbl->count].value,value,sizeof(tbl->entries[tbl->count].value));
+  tbl->count++;
+}
+
+static void register_builtin_string(void)
+{
+  builtinstring *tbl=&builtin_strings;
+
+  assert(tbl!=NULL);
+  for (int i=0; i<tbl->count; ++i) {
+    add_builtin_string_constant(tbl->entries[i].name,tbl->entries[i].value,sGLOBAL);
+  }
+}
+
+static void delete_builtin_string(void) {
+  builtinstring *tbl=&builtin_strings;
+
+  assert(tbl!=NULL);
+  free(tbl->entries);
+  tbl->entries=NULL;
+  tbl->count=0;
+  tbl->size=0;
 }
 
 /*  statement           - The Statement Parser
