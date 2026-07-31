@@ -439,6 +439,8 @@ static cell AMX_NATIVE_CALL core_random(AMX *amx,const cell *params)
     #else
         cell value = abs(params[1]);
     #endif
+  
+    if(value <= 1) return 0;
 
     /* one-time initialization (or, mostly one-time) */
     #if !defined SN_TARGET_PS2 && !defined _WIN32_WCE && !defined __ICC430__
