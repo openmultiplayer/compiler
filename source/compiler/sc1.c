@@ -219,6 +219,12 @@ static int optproccall = TRUE;  /* support "procedure call" */
 static int verbosity  = 1;      /* verbosity level, 0=quiet, 1=normal, 2=verbose */
 static int sc_reparse = 0;      /* needs 3th parse because of changed prototypes? */
 static int sc_parsenum = 0;     /* number of the extra parses */
+/* tags of functions used before definition whose tag
+ * had no user-defined operators when the definition was seen */
+#define sDEFERRED_REPARSE_MAX 64
+static int deferred_reparse_tags[sDEFERRED_REPARSE_MAX];
+static int deferred_reparse_count = 0;
+static int tag_has_operator(int tag);
 static int wq[wqTABSZ];         /* "while queue", internal stack for nested loops */
 static int *wqptr;              /* pointer to next entry */
 static time_t now;              /* current timestamp, for built-in constants "__time" and "__timestamp" */
@@ -671,6 +677,22 @@ int pc_compile(int argc, char *argv[])
     warnstack_init();
     preprocess();                       /* fetch first line */
     parse();                            /* process all input */
+    if (!sc_reparse) {
+      /* an operator for a deferred tag may have been
+       * declared after the function, so check again at the end of the pass */
+      int i;
+      for (i=0; i<deferred_reparse_count; i++) {
+        if (tag_has_operator(deferred_reparse_tags[i])) {
+          int curstatus=sc_status;
+          sc_status=statWRITE;
+          error(208);
+          sc_status=curstatus;
+          sc_reparse=TRUE;
+          break;
+        } /* if */
+      } /* for */
+    } /* if */
+    deferred_reparse_count=0;
     warnstack_cleanup();
     sc_parsenum++;
   } while (sc_reparse);
@@ -3756,6 +3778,37 @@ SC_FUNC char *funcdisplayname(char *dest,char *funcname)
   return dest;
 }
 
+/* TRUE if a user-defined operator (native or not) can
+ * take a value with the given tag as an operand, i.e. if the result of a
+ * function with this tag can select a user-defined operator. The result tag
+ * of an operator does not matter: "T:operator=(X:)" converts X to T, so a
+ * T-tagged function result is never its operand. */
+static int tag_has_operator(int tag)
+{
+  symbol *sym;
+  int tag1,tag2,unary;
+  char opname[sNAMEMAX+1];
+
+  tag&=TAGMASK;
+  for (sym=glbtab.next; sym!=NULL; sym=sym->next) {
+    char *name=sym->name;
+    if (sym->ident!=iFUNCTN)
+      continue;
+    if (isalpha(*name) || *name=='_' || *name==PUBLIC_CHAR || *name=='\0')
+      continue;                   /* a regular function, not an operator */
+    if (strlen(name)>sNAMEMAX)
+      return TRUE;                /* can't parse it safely - be conservative */
+    unary=parse_funcname(name,&tag1,&tag2,opname);
+    if (opname[0]=='=' && opname[1]=='\0') {
+      if ((tag2 & TAGMASK)==tag)  /* "tag1:operator=(tag2:)": tag2 is the operand */
+        return TRUE;
+    } else if ((!unary && (tag1 & TAGMASK)==tag) || (tag2 & TAGMASK)==tag) {
+      return TRUE;                /* binary operand or unary operand */
+    } /* if */
+  } /* for */
+  return FALSE;
+}
+
 static void check_reparse(symbol *sym)
 {
   /* if the function was used before being declared, and it has a tag for the
@@ -3764,6 +3817,15 @@ static void check_reparse(symbol *sym)
    * been incorrectly flagged (as the return tag was unknown at the time of
    * the call)
    */
+  if ((sym->usage & (uPROTOTYPED | uREAD))==uREAD && sym->tag!=0
+      && !tag_has_operator(sym->tag)) {
+    /* no operator uses this tag (yet) - the extra pass
+     * would change nothing; re-check at the end of the pass */
+    if (deferred_reparse_count<sDEFERRED_REPARSE_MAX) {
+      deferred_reparse_tags[deferred_reparse_count++]=sym->tag;
+      return;
+    } /* if */
+  } /* if */
   if ((sym->usage & (uPROTOTYPED | uREAD))==uREAD && sym->tag!=0) {
     int curstatus=sc_status;
     sc_status=statWRITE;  /* temporarily set status to WRITE, so the warning isn't blocked */
@@ -4122,6 +4184,13 @@ static int newfunc(char *firstname,int firsttag,int fpublic,int fstatic,int stoc
     if (matchtoken('{')) {
       lexpush();
     } else {
+      /* the body is a single statement at nesting level 0,
+       * so the arguments must not look like assignments made inside its
+       * "if"/"switch" branches (false warning 204) */
+      symbol *arg;
+      for (arg=loctab.next; arg!=NULL; arg=arg->next)
+        if (arg->assignlevel==1)
+          arg->assignlevel=0;
       /* Insert a separator so that comments following the statement will not
        * be attached to this function; they should be attached to the next
        * function. This is not a problem for functions having a compound block,
