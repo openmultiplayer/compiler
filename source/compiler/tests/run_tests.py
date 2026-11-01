@@ -58,10 +58,11 @@ def strip(s):
   return s.strip(' \t\r\n')
 
 class OutputCheckTest:
-  def __init__(self, name, errors=None, extra_args=None):
+  def __init__(self, name, errors=None, extra_args=None, stdout_pattern=None):
     self.name = name
     self.errors = errors
     self.extra_args = extra_args
+    self.stdout_pattern = stdout_pattern
 
   def run(self):
     args = [self.name + '.pwn']
@@ -84,6 +85,14 @@ class OutputCheckTest:
         'Actual errors:\n\n{}'
       ).format(expected_errors, errors)
       return False
+    if self.stdout_pattern is not None:
+      pattern = strip(normalize_newlines(self.stdout_pattern))
+      if re.search(pattern, normalize_newlines(stdout), re.MULTILINE) is None:
+        self.fail_reason = (
+          'Output didn\'t match\n\nExpected output pattern:\n\n{}\n\n'
+          'Actual output:\n\n{}'
+        ).format(pattern, stdout)
+        return False
     return True
 
 class PCodeCheckTest:
@@ -192,7 +201,8 @@ for meta_file in glob.glob('*.meta'):
     tests.append(OutputCheckTest(
       name=name,
       errors=metadata.get('errors'),
-      extra_args=metadata.get('extra_args')))
+      extra_args=metadata.get('extra_args'),
+      stdout_pattern=metadata.get('stdout_pattern')))
   elif test_type == 'pcode_check':
     tests.append(PCodeCheckTest(
       name=name,

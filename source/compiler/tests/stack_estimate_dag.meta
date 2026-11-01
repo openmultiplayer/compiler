@@ -1,0 +1,7 @@
+{
+  'test_type': 'output_check',
+  'extra_args': ['-v2'],
+  'stdout_pattern': r"""
+estimated max\. usage=75 cells
+"""
+}

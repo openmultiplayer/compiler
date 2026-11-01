@@ -1,0 +1,20 @@
+{
+  'test_type': 'output_check',
+  'extra_args': ['-v2', '-R+'],
+  'stdout_pattern': r"""
+^recursion detected: function Again directly calls itself
+recursion detected: function Base indirectly calls itself:
+Base <- Again <- Again <- Base
+recursion detected: function Fact directly calls itself
+recursion detected: function Helper indirectly calls itself:
+Helper <- Walk <- Helper
+recursion detected: function Ping directly calls itself
+recursion detected: function Pong indirectly calls itself:
+Pong <- Ping <- Pong
+recursion detected: function Walk directly calls itself
+Header size: .*
+Code size: .*
+Data size: .*
+Stack/heap size: .*; estimated max\. usage: unknown, due to recursion
+"""
+}

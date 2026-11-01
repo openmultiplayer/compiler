@@ -5061,42 +5061,109 @@ static void reduce_referrers(symbol *root)
 }
 
 #if !defined SC_LIGHT
-static long max_stacksize_recurse(symbol **sourcesym,symbol *sym,symbol **rsourcesym,long basesize,int *pubfuncparams,int *recursion)
+/* Per-function data for the stack estimate. While max_stacksize() runs, the
+ * entry of a function is info[sym->compound]: the "compound" field is unused
+ * for functions, so it holds the index (and is reset to 0 afterwards).
+ */
+typedef struct s_stkfunc {
+  symbol *sym;
+  long size;            /* memoized max_stacksize_recurse() with basesize 0 */
+  int scc;              /* strongly connected component of the referrer graph */
+  int index,lowlink;    /* for Tarjan's algorithm (index -1 = not visited) */
+  int onpath;           /* how often the function is on the current path */
+  char instack;         /* function is on the stack of Tarjan's algorithm */
+  char memo;            /* "size" and "recursion" are valid */
+  char recursion;       /* recursion was detected above this function */
+} stkfunc;
+
+#define STKFUNC(info,s) (&(info)[(s)->compound])
+
+/* Tarjan's algorithm: functions that reach each other through their
+ * referrers (that is, recursion) end up in the same component.
+ */
+static void stack_scc(stkfunc *info,symbol *sym,symbol **stack,int *stktop,int *counter,int *numscc)
+{
+  stkfunc *f=STKFUNC(info,sym);
+  stkfunc *r;
+  symbol *top;
+  int i;
+
+  assert(f->sym==sym);
+  f->index=f->lowlink=(*counter)++;
+  stack[(*stktop)++]=sym;
+  f->instack=TRUE;
+  for (i=0; i<sym->numrefers; i++) {
+    if (sym->refer[i]==NULL)
+      continue;
+    r=STKFUNC(info,sym->refer[i]);
+    assert(r->sym==sym->refer[i]);
+    if (r->index<0) {
+      stack_scc(info,sym->refer[i],stack,stktop,counter,numscc);
+      if (r->lowlink<f->lowlink)
+        f->lowlink=r->lowlink;
+    } else if (r->instack && r->index<f->lowlink) {
+      f->lowlink=r->index;
+    } /* if */
+  } /* for */
+  if (f->lowlink==f->index) {
+    do {
+      top=stack[--(*stktop)];
+      STKFUNC(info,top)->instack=FALSE;
+      STKFUNC(info,top)->scc=*numscc;
+    } while (top!=sym);
+    (*numscc)++;
+  } /* if */
+}
+
+static long max_stacksize_recurse(stkfunc *info,symbol *sym,long basesize,int *pubfuncparams,int *recursion)
 {
   long size,maxsize;
-  int i,stkpos;
+  int i,rec;
+  stkfunc *f,*r;
+  symbol *ref;
 
-  assert(sourcesym!=NULL);
+  assert(info!=NULL);
   assert(sym!=NULL);
   assert(sym->ident==iFUNCTN);
   assert((sym->usage & uNATIVE)==0);
   assert(recursion!=NULL);
 
+  f=STKFUNC(info,sym);
   maxsize=sym->x.stacksize;
   for (i=0; i<sym->numrefers; i++) {
-    if (sym->refer[i]!=NULL) {
-      assert(sym->refer[i]->ident==iFUNCTN);
-      assert((sym->refer[i]->usage & uNATIVE)==0); /* a native function cannot refer to a user-function */
-      *(rsourcesym)=sym;
-      *(rsourcesym+1)=NULL;
-      for (stkpos=0; sourcesym[stkpos]!=NULL; stkpos++) {
-        if (sym->refer[i]==sourcesym[stkpos]) {   /* recursion detection */
-          *recursion=TRUE;
-          goto break_recursion;         /* recursion was detected, quit loop */
-        } /* if */
-      } /* for */
-      /* add this symbol to the stack */
-      sourcesym[stkpos]=sym;
-      sourcesym[stkpos+1]=NULL;
-      /* check size of callee */
-      size=max_stacksize_recurse(sourcesym,sym->refer[i],rsourcesym+1,sym->x.stacksize,pubfuncparams,recursion);
-      if (maxsize<size)
-        maxsize=size;
-      /* remove this symbol from the stack */
-      sourcesym[stkpos]=NULL;
+    ref=sym->refer[i];
+    if (ref==NULL)
+      continue;
+    assert(ref->ident==iFUNCTN);
+    assert((ref->usage & uNATIVE)==0); /* a native function cannot refer to a user-function */
+    r=STKFUNC(info,ref);
+    assert(r->sym==ref);
+    if (r->onpath>0) {          /* recursion detection */
+      *recursion=TRUE;
+      break;                    /* recursion was detected, quit loop */
     } /* if */
+    f->onpath++;                /* add this symbol to the path */
+    if (r->scc!=f->scc) {
+      /* no function on the path can be reached from "ref" (it would be in
+       * the same component as "sym"), so its result does not depend on the
+       * path: compute it once */
+      if (!r->memo) {
+        rec=FALSE;
+        r->size=max_stacksize_recurse(info,ref,0L,pubfuncparams,&rec);
+        r->recursion=(char)rec;
+        r->memo=TRUE;
+      } /* if */
+      size=r->size+sym->x.stacksize;
+      if (r->recursion)
+        *recursion=TRUE;
+    } else {
+      /* check size of callee */
+      size=max_stacksize_recurse(info,ref,sym->x.stacksize,pubfuncparams,recursion);
+    } /* if */
+    f->onpath--;                /* remove this symbol from the path */
+    if (maxsize<size)
+      maxsize=size;
   } /* for */
-  break_recursion:
 
   if ((sym->usage & uPUBLIC)!=0) {
     /* Find out how many parameters a public function has, then see if this
@@ -5117,26 +5184,69 @@ static long max_stacksize_recurse(symbol **sourcesym,symbol *sym,symbol **rsourc
   return maxsize+basesize;
 }
 
+/* Fill "chain" with the path that the walk from "sym" took last when every
+ * referrer is followed (no memo): the chain the recursion report prints. In
+ * each function on it, the walk ended at the first referrer that was already
+ * on the path, or else at the last referrer. A function without referrers
+ * does not appear. The chain ends with NULL.
+ */
+static void recursion_chain(stkfunc *info,symbol *sym,symbol **chain)
+{
+  int depth,i,last,onpath;
+
+  assert(STKFUNC(info,sym)->onpath==1);
+  for (depth=0; ; depth++) {
+    last=-1;
+    onpath=FALSE;
+    for (i=0; i<sym->numrefers && !onpath; i++) {
+      if (sym->refer[i]!=NULL) {
+        last=i;
+        onpath=(STKFUNC(info,sym->refer[i])->onpath>0);
+      } /* if */
+    } /* for */
+    if (last<0)
+      break;
+    chain[depth]=sym;
+    chain[depth+1]=NULL;
+    if (onpath)
+      break;
+    STKFUNC(info,sym)->onpath++;
+    sym=sym->refer[last];
+  } /* for */
+  /* take the functions that were added off the path again */
+  for (i=0; i<depth; i++)
+    STKFUNC(info,chain[i])->onpath--;
+}
+
 static long max_stacksize(symbol *root,int *recursion)
 {
   /* Loop over all non-native functions. For each function, loop
    * over all of its referrers, accumulating the stack requirements.
-   * Detect (indirect) recursion with a "mark-and-sweep" algorithm.
-   * I (mis-)use the "compound" field of the symbol structure for
-   * the marker, as this field is unused for functions.
+   * A referrer that is already on the path means (indirect) recursion;
+   * the walk then skips the remaining referrers of that function.
+   *
+   * The functions on the path all reach the current function, so the
+   * walk from a function can only meet those that are in the same
+   * strongly connected component (they reach each other: recursion).
+   * When the walk enters another component, it meets none of them, so
+   * the result for that function is computed once and reused. Without
+   * recursion, this visits each function and referrer a few times
+   * instead of following every path; within a component, every path is
+   * still followed, as before.
    *
    * Note that the stack is shared with the heap. A host application
    * may "eat" cells from the heap as well, through amx_Allot(). The
    * stack requirements are thus only an estimate.
    */
   long size,maxsize;
-  int maxparams,numfunctions;
+  int maxparams,numfunctions,counter,numscc,stktop;
   symbol *sym;
-  symbol **symstack,**rsymstack;
+  symbol **sccstack,**rsymstack;
+  stkfunc *info;
 
   assert(root!=NULL);
   assert(recursion!=NULL);
-  /* count number of functions (for allocating the stack for recursion detection) */
+  /* count number of functions (for allocating the per-function data) */
   numfunctions=0;
   for (sym=root->next; sym!=NULL; sym=sym->next) {
     if (sym->ident==iFUNCTN) {
@@ -5145,13 +5255,31 @@ static long max_stacksize(symbol *root,int *recursion)
         numfunctions++;
     } /* if */
   } /* for */
-  /* allocate function symbol stack */
-  symstack=(symbol **)malloc((numfunctions+1)*sizeof(symbol*));
-  rsymstack=(symbol **)malloc((numfunctions+1)*sizeof(symbol*));
-  if (symstack==NULL || rsymstack==NULL)
+  /* allocate the per-function data and the stacks; a function that calls
+   * itself can be on the path twice, so the chain for the recursion report
+   * holds up to 2*numfunctions functions plus the terminating NULL */
+  info=(stkfunc *)malloc((numfunctions+1)*sizeof(stkfunc));
+  sccstack=(symbol **)malloc((numfunctions+1)*sizeof(symbol*));
+  rsymstack=(symbol **)malloc((2*numfunctions+2)*sizeof(symbol*));
+  if (info==NULL || sccstack==NULL || rsymstack==NULL)
     error(103);         /* insufficient memory (fatal error) */
-  memset(symstack,0,(numfunctions+1)*sizeof(symbol*));
-  memset(rsymstack,0,(numfunctions+1)*sizeof(symbol*));
+  memset(info,0,(numfunctions+1)*sizeof(stkfunc));
+  memset(rsymstack,0,(2*numfunctions+2)*sizeof(symbol*));
+  numfunctions=0;
+  for (sym=root->next; sym!=NULL; sym=sym->next) {
+    if (sym->ident==iFUNCTN && (sym->usage & uNATIVE)==0) {
+      sym->compound=numfunctions;
+      info[numfunctions].sym=sym;
+      info[numfunctions].index=-1;
+      numfunctions++;
+    } /* if */
+  } /* for */
+  counter=numscc=stktop=0;
+  for (sym=root->next; sym!=NULL; sym=sym->next)
+    if (sym->ident==iFUNCTN && (sym->usage & uNATIVE)==0 && STKFUNC(info,sym)->index<0)
+      stack_scc(info,sym,sccstack,&stktop,&counter,&numscc);
+  assert(stktop==0);
+  free((void*)sccstack);
 
   maxsize=0;
   maxparams=0;
@@ -5162,11 +5290,11 @@ static long max_stacksize(symbol *root,int *recursion)
     if (sym->ident!=iFUNCTN || (sym->usage & uNATIVE)!=0)
       continue;
     /* accumulate stack size for this symbol */
-    symstack[0]=sym;
-    assert(symstack[1]==NULL);
+    STKFUNC(info,sym)->onpath=1;  /* the path starts at this function */
     recursion_detected=FALSE;
-    size=max_stacksize_recurse(symstack,sym,rsymstack,0L,&maxparams,&recursion_detected);
+    size=max_stacksize_recurse(info,sym,0L,&maxparams,&recursion_detected);
     if (recursion_detected && pc_recursion) {
+      recursion_chain(info,sym,rsymstack);
       if (rsymstack[1]==NULL) {
         pc_printf("recursion detected: function %s directly calls itself\n", sym->name);
       } else {
@@ -5180,12 +5308,16 @@ static long max_stacksize(symbol *root,int *recursion)
       }
       *recursion=recursion_detected;
     }
+    STKFUNC(info,sym)->onpath=0;
     assert(size>=0);
     if (maxsize<size)
       maxsize=size;
   } /* for */
 
-  free((void*)symstack);
+  for (sym=root->next; sym!=NULL; sym=sym->next)
+    if (sym->ident==iFUNCTN && (sym->usage & uNATIVE)==0)
+      sym->compound=0;
+  free((void*)info);
   free((void*)rsymstack);
   maxsize++;                  /* +1 because a zero cell is always pushed on top
                                * of the stack to catch stack overwrites */
