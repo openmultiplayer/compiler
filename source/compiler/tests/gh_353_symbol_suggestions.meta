@@ -3,7 +3,7 @@
   'errors': """
 gh_353_symbol_suggestions.pwn(12) : error 017: undefined symbol "abcxyz"
 gh_353_symbol_suggestions.pwn(20) : error 017: undefined symbol "length"
-gh_353_symbol_suggestions.pwn(30) : error 017: undefined symbol "float"
+gh_353_symbol_suggestions.pwn(30) : error 017: undefined symbol "float"; did you mean "fstat"?
 gh_353_symbol_suggestions.pwn(40) : error 017: undefined symbol "ab"
 gh_353_symbol_suggestions.pwn(41) : error 017: undefined symbol "ab"
 gh_353_symbol_suggestions.pwn(50) : error 017: undefined symbol "staticval"

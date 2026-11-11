@@ -9,5 +9,5 @@ main()
 	new second = day_seconds % 60;
 	new buf[9];
 	strformat(buf, _, _, "%02d:%02d:%02d", hour, minute, second);
-	printf("result: %d\n", strcmp(buf, __time));
+	printf("result: %d", strcmp(buf, __time));
 }
