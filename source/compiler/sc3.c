@@ -1908,6 +1908,7 @@ restart:
         if (lval2.sym!=NULL && lval2.sym->parent!=NULL && lval2.sym->dim.array.length>0 && sym->dim.array.level==0) {
           lval1->tag=lval2.sym->x.tags.index;
           lval1->constval=lval2.sym->dim.array.length;
+          lval1->cmptag=lval2.sym->x.tags.field;
         } /* if */
       } else {
         /* array index is not constant */
@@ -2485,7 +2486,11 @@ static int nesting=0;
               if (arg[argidx].dim[0]!=0) {
                 assert(arg[argidx].dim[0]>0);
                 if (lval.ident==iARRAYCELL) {
-                  error(47);        /* array sizes must match */
+                  cell array_sz=lval.constval;
+                  if (array_sz<0)
+                    array_sz= -array_sz;
+                  if (array_sz<=0 || arg[argidx].dim[0]!=array_sz)
+                    error(47);      /* array sizes must match */
                 } else {
                   assert(lval.constval!=0); /* literal array must have a size */
                   /* A literal array must have exactly the same size as the
@@ -2497,6 +2502,8 @@ static int nesting=0;
                     error(47);      /* array sizes must match */
                 } /* if */
               } /* if */
+              if (lval.ident==iARRAYCELL)
+                check_index_tagmismatch(arg[argidx].name,arg[argidx].idxtag[0],lval.cmptag,TRUE,0);
             } /* if */
             if (lval.ident!=iARRAYCELL || lval.constval > 0) {
               /* save array size, for default values with uSIZEOF flag */
@@ -2828,4 +2835,3 @@ static int constant(value *lval)
   } /* if */
   return TRUE;                  /* yes, it was a constant value */
 }
-

@@ -1,0 +1,7 @@
+{
+  'test_type': 'runtime',
+  'output': """
+enum_field_array_slice.amx returns 6
+  """,
+  'should_fail': False
+}
